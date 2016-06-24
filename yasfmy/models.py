@@ -3,10 +3,14 @@ from abc import abstractmethod
 import chainer
 import chainer.functions as F
 import chainer.links as L
+from chainer import Variable as V
 from chainer import cuda
 from chainer import serializers
 
-from variable import Variable as xp
+from .wrapper import xp
+from .preprocessing import gen_word
+
+IGNORE_LABEL = -1
 
 class BaseModel(chainer.Chain):
     @abstractmethod
@@ -35,7 +39,7 @@ class Decoder(BaseModel):
     def __init__(self, vocab_size, embed_size, hidden_size):
         super().__init__(
             # embedding previous output
-            ye = L.EmbedID(vocab_size, embed_size),
+            ye = L.EmbedID(vocab_size, embed_size, IGNORE_LABEL),
             # input(previous output) weight vector
             eh = L.Linear(embed_size, 4 * hidden_size),
             # hidden weight vector
@@ -77,13 +81,14 @@ class Attention(BaseModel):
         '''
         batch_size = p.data.shape[0]
         e_list = []
-        sum_e = xp.zeros((batch_size, 1), dtype=xp.float32)
+        sum_e = V(xp.zeros((batch_size, 1), dtype=xp.float32))
         for a, b in zip(a_list, b_list):
             w = F.tanh(self.aw(a) + self.bw(b) + self.pw(p))
             e = F.exp(self.we(w))
             e_list.append(e)
             sum_e += e
-        aa = bb = xp.zeros((batch_size, self.hidden_size), dtype=xp.float32)
+        aa = bb = V(
+            xp.zeros((batch_size, self.hidden_size), dtype=xp.float32))
         for a, b, e in zip(a_list, b_list, e_list):
             e /= sum_e
             aa += F.reshape(F.batch_matmul(a, e), (batch_size, self.hidden_size))
@@ -91,50 +96,46 @@ class Attention(BaseModel):
         return aa, bb
 
 class AttentionMT(BaseModel):
-    def __init__(self, vocab_size, embed_size, hidden_size):
+    def __init__(self, src_size, trg_size, embed_size, hidden_size):
         super().__init__(
-            emb = EmbedID(vocab_size, embed_size),
+            emb = L.EmbedID(src_size, embed_size, IGNORE_LABEL),
             fenc = Encoder(embed_size, hidden_size),
             benc = Encoder(embed_size, hidden_size),
             att = Attention(hidden_size),
-            dec = Decoder(vocab_size, embed_size, hidden_size)
+            dec = Decoder(trg_size, embed_size, hidden_size)
         )
-        self.vocab_size = vocab_size
         self.embed_size = embed_size
         self.hidden_size = hidden_size
 
-    def reset(self):
-        self.zerograds()
-        self.x_list = []
-
-    def __call__(self, x, t, x_vocab):
-        y = self.forward(x, t, x_vocab)
-        loss = F.softmax_cross_entropy(y, t)
-        return loss
-
-    def forward(self, x, y, x_vocab):
+    def __call__(self, src, trg, trg_stoi):
         # preparing
-        hidden_init = xp.zeros((self.hidden_size,))
-        # embedding sentence
-        x_list = [F.tanh(self.emb(w)) for w in x]
+        batch_len = len(src)
+        hidden_init = V(xp.zeros(
+            (batch_len, self.hidden_size), dtype=xp.float32))
+        x_list = []
+        for x in gen_word(src):
+            x_list.append(F.tanh(self.emb(x)))
         # forward encoding
         a_list = []
-        c, a = hidden_init
+        c = a = hidden_init
         for x in x_list:
             c, a = self.fenc(x, c, a)
             a_list.append(a)
         # backward encoding
         b_list = []
-        c, b = hidden_init
-        for x in x_list:
+        c = b = hidden_init
+        for x in reversed(x_list):
             c, b = self.benc(x, c, b)
             b_list.append(b)
         # attention
         h = hidden_init
-        t = x_vocab[]
-        p_list = []
-        for _ in range(len(y)):
+        y = V(xp.array([trg_stoi['<s>'] for _ in range(batch_len)], dtype=xp.int32))
+        y_batch = []
+        loss = V(xp.zeros(None, dtype=xp.float32))
+        for t in gen_word(trg):
             aa, bb = self.att(a_list, b_list, h)
-            p, c, h = self.dec(p, c, h, aa, bb)
-            p_list.append(p.data.argmax())
-        return p_list
+            y, c, h = self.dec(y, c, h, aa, bb)
+            y_batch.append(y)
+            loss += F.softmax_cross_entropy(y, t)
+            y = t
+        return y_batch, loss
