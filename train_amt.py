@@ -13,7 +13,7 @@ def main():
     trg_lines1, trg_lines2 = tee(gen_lines('../data/mt/train.en'), 2)
     train_src_vocab = vocab(src_lines1, 10)
     train_trg_vocab = vocab(trg_lines1, 10)
-    itow = train_trg_vocab.itos
+    itow = train_trg_vocab.itow
 
     attmt = AttentionMT(len(train_src_vocab), len(train_trg_vocab), 500, 200)
     attmt.use_gpu()
