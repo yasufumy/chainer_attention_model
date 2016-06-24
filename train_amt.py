@@ -16,8 +16,7 @@ def main():
     itow = train_trg_vocab.itos
 
     attmt = AttentionMT(len(train_src_vocab), len(train_trg_vocab), 500, 200)
-    cuda.get_device(0).use()
-    attmt.to_gpu()
+    attmt.use_gpu()
     opt = optimizers.AdaGrad(lr = 0.01)
     opt.setup(attmt)
 
