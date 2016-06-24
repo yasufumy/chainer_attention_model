@@ -32,5 +32,5 @@ class Vocabulary:
         return self.__wtoi
 
     @property
-    def wtos(self):
+    def itow(self):
         return self.__itow
