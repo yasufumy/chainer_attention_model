@@ -17,6 +17,10 @@ class BaseModel(chainer.Chain):
     def __call__(self):
         pass
 
+    def use_gpu(self, gpu_id):
+        cuda.get_device(gpu_id).use()
+        self.to_gpu()
+
     def save_model(self, filename):
         pass
 
