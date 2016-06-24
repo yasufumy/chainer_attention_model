@@ -12,10 +12,10 @@ def gen_lines(filename):
 
 def gen_batch(lines, vocab, batch_size):
     batch = []
-    stoi = vocab.stoi
+    wtoi = vocab.wtoi
     for line in lines:
-        batch.append([stoi['<s>']]+
-                [stoi[word] for word in line] + [stoi['</s>']])
+        batch.append([wtoi['<s>']]+
+                [wtoi[word] for word in line] + [wtoi['</s>']])
         if len(batch) == batch_size:
             yield fill_batch(batch)
             batch = []

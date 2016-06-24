@@ -28,7 +28,7 @@ def main():
         trg_gen = gen_batch(train_trg_lines, train_trg_vocab, batch_size)
         for x_batch, t_batch in zip(src_gen, trg_gen):
             attmt.zerograds()
-            y_batch, loss = attmt(x_batch, t_batch, train_trg_vocab.stoi)
+            y_batch, loss = attmt(x_batch, t_batch, train_trg_vocab.wtoi)
             loss.backward()
             opt.update()
             tqdm.write('loss:%f' % loss.data)

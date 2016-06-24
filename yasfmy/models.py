@@ -107,7 +107,7 @@ class AttentionMT(BaseModel):
         self.embed_size = embed_size
         self.hidden_size = hidden_size
 
-    def __call__(self, src, trg, trg_stoi):
+    def __call__(self, src, trg, trg_wtoi):
         # preparing
         batch_len = len(src)
         hidden_init = V(xp.zeros(
@@ -129,7 +129,7 @@ class AttentionMT(BaseModel):
             b_list.append(b)
         # attention
         h = hidden_init
-        y = V(xp.array([trg_stoi['<s>'] for _ in range(batch_len)], dtype=xp.int32))
+        y = V(xp.array([trg_wtoi['<s>'] for _ in range(batch_len)], dtype=xp.int32))
         y_batch = []
         loss = V(xp.zeros(None, dtype=xp.float32))
         for t in gen_word(trg):
