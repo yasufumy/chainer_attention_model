@@ -1,28 +1,34 @@
 from itertools import chain
 import io
 
-class Preprocessing:
-    @classmethod
-    def get_vocab(cls, document):
-        vocab = {}
-        if type(document) is io.TextIOWrapper:
-            words = document.read().rstrip('\n').split()
-        elif type(document) is str:
-            words = document.rstrip('\n').split()
-        elif type(document) is list:
-            if cls._is_nested(document):
-                words = cls.flatten(document)
-            else:
-                words = document
-        for word in words:
-            if word not in vocab:
-                vocab[word] = len(vocab)
-        return vocab
+from chainer import Variable as V
 
-    @staticmethod
-    def flatten(nested):
-        return list(chain.from_iterable(nested))
+from .wrapper import xp
 
-    @staticmethod
-    def _is_nested(arr):
-        return any(isinstance(i, list) for i in arr)
+def gen_lines(filename):
+    with open(filename) as f:
+        for line in f:
+            yield line.split()
+
+def gen_batch(lines, vocab, batch_size):
+    batch = []
+    stoi = vocab.stoi
+    for line in lines:
+        batch.append([stoi['<s>']]+
+                [stoi[word] for word in line] + [stoi['</s>']])
+        if len(batch) == batch_size:
+            yield fill_batch(batch)
+            batch = []
+    if batch:
+        yield batch
+
+def gen_word(batch):
+    batch_len = len(batch)
+    line_len = len(batch[0])
+    for l in range(line_len):
+        yield V(xp.array(
+            [batch[k][l] for k in range(batch_len)], dtype=xp.int32))
+
+def fill_batch(batch, token=-1):
+    max_len = max(len(x) for x in batch)
+    return [x + [token] * (max_len - len(x) + 1) for x in batch]
