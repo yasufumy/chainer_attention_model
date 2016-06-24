@@ -7,8 +7,8 @@ from chainer import Variable as V
 from chainer import cuda
 from chainer import serializers
 
-from .wrapper import xp
-from .preprocessing import gen_word
+from wrapper import xp
+from preprocessing import gen_word
 
 IGNORE_LABEL = -1
 

@@ -3,7 +3,7 @@ import io
 
 from chainer import Variable as V
 
-from .wrapper import xp
+from wrapper import xp
 
 def gen_lines(filename):
     with open(filename) as f:
