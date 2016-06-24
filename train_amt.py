@@ -11,6 +11,7 @@ from yasfmy.vocabulary import Vocabulary as vocab
 def main():
     train_src_vocab = vocab(gen_lines('../data/mt/train.de'), 10)
     train_trg_vocab = vocab(gen_lines('../data/mt/train.en'), 10)
+    itow = train_trg_vocab.itos
 
     attmt = AttentionMT(len(train_src_vocab), len(train_trg_vocab), 500, 200)
     cuda.get_device(0).use()
@@ -21,7 +22,7 @@ def main():
     n_epoch = 5
     batch_size = 64
 
-    for epoch in tqdm(range(n_epoch), desc='epoch loop', leave=False):
+    for epoch in range(n_epoch):
         train_src_lines = gen_lines('../data/mt/train.de')
         train_trg_lines = gen_lines('../data/mt/train.en')
         src_gen = gen_batch(train_src_lines, train_src_vocab, batch_size)
@@ -31,7 +32,9 @@ def main():
             y_batch, loss = attmt(x_batch, t_batch, train_trg_vocab.stoi)
             loss.backward()
             opt.update()
-            tqdm.write('loss:%f' % loss.data)
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
