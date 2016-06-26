@@ -130,7 +130,7 @@ class AttentionMT(BaseModel):
             b_list.append(b)
         # attention
         h = hidden_init
-        y = xp.Array([trg_stoi['<s>'] for _ in range(batch_len)], dtype=xp.int32)
+        y = xp.Array([trg_wtoi['<s>'] for _ in range(batch_len)], dtype=xp.int32)
         y_batch = []
         loss = xp.Zeros(None, dtype=xp.float32)
         for t in gen_word(trg):
