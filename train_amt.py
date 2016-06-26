@@ -9,10 +9,10 @@ from yasfmy.wrapper import xp
 from yasfmy.vocabulary import Vocabulary as vocab
 
 def main():
-    src_lines1, src_lines2 = tee(gen_lines('../data/mt/train.de'), 2)
-    trg_lines1, trg_lines2 = tee(gen_lines('../data/mt/train.en'), 2)
-    train_src_vocab = vocab(src_lines1, 10)
-    train_trg_vocab = vocab(trg_lines1, 10)
+    src_lines = gen_lines('../data/mt/train.de')
+    trg_lines = gen_lines('../data/mt/train.en')
+    train_src_vocab = vocab(src_lines, 10)
+    train_trg_vocab = vocab(trg_lines, 10)
     itow = train_trg_vocab.itow
 
     attmt = AttentionMT(len(train_src_vocab), len(train_trg_vocab), 500, 200)
@@ -24,8 +24,10 @@ def main():
     batch_size = 64
 
     for epoch in range(n_epoch):
-        src_gen = gen_batch(src_lines2, train_src_vocab, batch_size)
-        trg_gen = gen_batch(trg_lines2, train_trg_vocab, batch_size)
+        src_lines = gen_lines('../data/mt/train.de')
+        trg_lines = gen_lines('../data/mt/train.en')
+        src_gen = gen_batch(src_lines, train_src_vocab, batch_size)
+        trg_gen = gen_batch(trg_lines, train_trg_vocab, batch_size)
         for x_batch, t_batch in zip(src_gen, trg_gen):
             attmt.zerograds()
             y_batch, loss = attmt(x_batch, t_batch, train_trg_vocab.wtoi)
