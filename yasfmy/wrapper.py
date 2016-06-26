@@ -9,6 +9,7 @@ def wrap_variable(func):
     def wrapper(*args, **kwargs):
         result = func(*args, **kwargs)
         return Variable(result)
+    return wrapper
 
 class xpmeta(type):
     def __new__(cls, clsname, bases, clsdict):
