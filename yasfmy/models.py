@@ -132,14 +132,14 @@ class AttentionMT(BaseModel):
             c, b = self.benc(x, c, b)
             b_list.append(b)
         # attention
-        h = hidden_init
+        c = h = hidden_init
         y = V(xp.array([trg_wtoi['<s>'] for _ in range(batch_len)], dtype=xp.int32))
         y_batch = []
-        loss = V(xp.zeros(None, dtype=xp.float32))
+        loss = V(xp.array(0, dtype=xp.float32))
         for t in gen_word(trg):
             aa, bb = self.att(a_list, b_list, h)
             y, c, h = self.dec(y, c, h, aa, bb)
-            y_batch.append(y)
+            y_batch.append(y.data)
             loss += F.softmax_cross_entropy(y, t)
             y = t
         return y_batch, loss
