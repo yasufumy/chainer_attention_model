@@ -16,7 +16,7 @@ def main():
     itow = train_trg_vocab.itow
 
     attmt = AttentionMT(len(train_src_vocab), len(train_trg_vocab), 500, 200)
-    attmt.use_gpu()
+    attmt.use_gpu(0)
     opt = optimizers.AdaGrad(lr = 0.01)
     opt.setup(attmt)
 
@@ -29,8 +29,13 @@ def main():
         for x_batch, t_batch in zip(src_gen, trg_gen):
             attmt.zerograds()
             y_batch, loss = attmt(x_batch, t_batch, train_trg_vocab.wtoi)
+            word_id_list = [y.argmax(axis=1) for y in y_batch]
+            for i in range(len(t_batch)):
+                print(' '.join([train_trg_vocab.itow[int(word_id_list[k][i])] for k in range(len(word_id_list))]))
+                print()
             loss.backward()
             opt.update()
+    serializers.save_npz('test.model', attmt)
 
 if __name__ == '__main__':
     try:
