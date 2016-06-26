@@ -1,5 +1,3 @@
-from functools import wraps
-
 from chainer import cuda
 from chainer import Variable as V
 import numpy as np
