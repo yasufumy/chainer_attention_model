@@ -3,7 +3,6 @@ from abc import abstractmethod
 import chainer
 import chainer.functions as F
 import chainer.links as L
-from chainer import Variable as V
 from chainer import cuda
 from chainer import serializers
 
@@ -85,14 +84,13 @@ class Attention(BaseModel):
         '''
         batch_size = p.data.shape[0]
         e_list = []
-        sum_e = V(xp.zeros((batch_size, 1), dtype=xp.float32))
+        sum_e = xp.Zeros((batch_size, 1), dtype=xp.float32)
         for a, b in zip(a_list, b_list):
             w = F.tanh(self.aw(a) + self.bw(b) + self.pw(p))
             e = F.exp(self.we(w))
             e_list.append(e)
             sum_e += e
-        aa = bb = V(
-            xp.zeros((batch_size, self.hidden_size), dtype=xp.float32))
+        aa = bb = xp.Zeros((batch_size, self.hidden_size), dtype=xp.float32)
         for a, b, e in zip(a_list, b_list, e_list):
             e /= sum_e
             aa += F.reshape(F.batch_matmul(a, e), (batch_size, self.hidden_size))
@@ -114,8 +112,7 @@ class AttentionMT(BaseModel):
     def __call__(self, src, trg, trg_wtoi):
         # preparing
         batch_len = len(src)
-        hidden_init = V(xp.zeros(
-            (batch_len, self.hidden_size), dtype=xp.float32))
+        hidden_init = xp.Zeros((batch_len, self.hidden_size), dtype=xp.float32)
         x_list = []
         for x in gen_word(src):
             x_list.append(F.tanh(self.emb(x)))
@@ -132,10 +129,10 @@ class AttentionMT(BaseModel):
             c, b = self.benc(x, c, b)
             b_list.append(b)
         # attention
-        c = h = hidden_init
-        y = V(xp.array([trg_wtoi['<s>'] for _ in range(batch_len)], dtype=xp.int32))
+        h = hidden_init
+        y = xp.Array([trg_stoi['<s>'] for _ in range(batch_len)], dtype=xp.int32)
         y_batch = []
-        loss = V(xp.array(0, dtype=xp.float32))
+        loss = xp.Zeros(None, dtype=xp.float32)
         for t in gen_word(trg):
             aa, bb = self.att(a_list, b_list, h)
             y, c, h = self.dec(y, c, h, aa, bb)
