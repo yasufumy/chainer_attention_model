@@ -21,7 +21,8 @@ class BaseModel(chainer.Chain):
         self.to_gpu()
 
     def save_model(self, filename):
-        pass
+        self.to_cpu()
+        serializers.save_npz(filename, self)
 
     def load_model(self, filename):
         pass
