@@ -12,14 +12,14 @@ from yasfmy.vocabulary import Vocabulary as vocab
 from yasfmy.helper import timer
 
 @timer
-def main():
+def train():
     src_lines = gen_lines('../data/mt/train.de')
     trg_lines = gen_lines('../data/mt/train.en')
-    train_src_vocab = vocab(src_lines, 10)
-    train_trg_vocab = vocab(trg_lines, 10)
-    itow = train_trg_vocab.itow
+    src_vocab = vocab(src_lines, 10)
+    trg_vocab = vocab(trg_lines, 10)
+    itow = trg_vocab.itow
 
-    attmt = AttentionMT(len(train_src_vocab), len(train_trg_vocab), 200, 100)
+    attmt = AttentionMT(len(src_vocab), len(trg_vocab), 200, 100)
     attmt.use_gpu(0)
     opt = optimizers.AdaGrad(lr = 0.01)
     opt.setup(attmt)
@@ -30,21 +30,21 @@ def main():
     for epoch in tqdm(range(n_epoch)):
         src_lines = gen_lines('../data/mt/train.de')
         trg_lines = gen_lines('../data/mt/train.en')
-        src_gen = gen_batch(src_lines, train_src_vocab, batch_size)
-        trg_gen = gen_batch(trg_lines, train_trg_vocab, batch_size)
+        src_gen = gen_batch(src_lines, src_vocab, batch_size)
+        trg_gen = gen_batch(trg_lines, trg_vocab, batch_size)
         for x_batch, t_batch in zip(src_gen, trg_gen):
             attmt.zerograds()
-            y_batch, loss = attmt(x_batch, t_batch, train_trg_vocab.wtoi)
+            y_batch, loss = attmt(x_batch, t_batch, trg_vocab.wtoi)
             word_id_list = [y.argmax(axis=1) for y in y_batch]
             for i in range(len(t_batch)):
                 tqdm.write('epoch: ' + str(epoch) + ' [' + datetime.now().strftime("%Y/%m/%d %H:%M:%S") + ']: ' +\
-                        ' '.join([train_trg_vocab.itow[int(word_id_list[k][i])] for k in range(len(word_id_list))]))
+                        ' '.join([trg_vocab.itow[int(word_id_list[k][i])] for k in range(len(word_id_list))]))
             loss.backward()
             opt.update()
     attmt.save_model('test.model')
 
 if __name__ == '__main__':
     try:
-        main()
+        train()
     except KeyboardInterrupt:
         pass
