@@ -17,6 +17,7 @@ class xpmeta(type):
         methods = ['array', 'zeros']
         for name in methods:
             setattr(xp, name.capitalize(), generate_variabled_method(xp, name))
+        setattr(xp, 'Variable', V)
         return xp
 
 class xp(metaclass=xpmeta):
