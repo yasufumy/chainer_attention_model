@@ -114,18 +114,18 @@ class AttentionMT(BaseModel):
     def __call__(self, src, trg, trg_wtoi):
         # preparing
         batch_len = src[0].data.shape[0]
-        hidden_init = xp.Zeros((batch_len, self.hidden_size), dtype=xp.float32)
+        self.hidden_init = xp.Zeros((batch_len, self.hidden_size), dtype=xp.float32)
         y = xp.Array([trg_wtoi[START_TOKEN] for _ in range(batch_len)], dtype=xp.int32)
         # embeding words
         x_list = [F.tanh(self.emb(x)) for x in src]
         # encoding
-        a_list, b_list = self.forward_enc(x_list, hidden_init)
+        a_list, b_list = self.forward_enc(x_list)
         # attention
-        y_batch, loss = self.forward_dec_train(trg, a_list, b_list, (hidden_init, y))
+        y_batch, loss = self.forward_dec_train(trg, a_list, b_list, y)
         return y_batch, loss
 
-    def forward_enc(self, x_list, initial_value):
-        fc = fh = bc = bh = initial_value
+    def forward_enc(self, x_list):
+        fc = fh = bc = bh = self.hidden_init
         fenc_list = benc_list = []
         for fx, bx in zip(x_list, reversed(x_list)):
             fc, fh = self.fenc(fx, fc, fh)
@@ -134,9 +134,8 @@ class AttentionMT(BaseModel):
             benc_list.append(bh)
         return fenc_list, benc_list
 
-    def forward_dec_train(self, trg, a_list, b_list, initial_value):
-        h = c = initial_value[0]
-        y = initial_value[1]
+    def forward_dec_train(self, trg, a_list, b_list, y):
+        h = c = self.hidden_init
         y_batch = []
         loss = xp.Zeros(None, dtype=xp.float32)
         for t in trg:
