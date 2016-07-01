@@ -6,7 +6,7 @@ from chainer import serializers
 from tqdm import tqdm
 
 from yasfmy.models import AttentionMT
-from yasfmy.preprocessing import gen_lines, gen_batch, gen_word
+from yasfmy.preprocessing import gen_lines, line2batch, batch2line
 from yasfmy.wrapper import xp
 from yasfmy.vocabulary import Vocabulary as vocab
 from yasfmy.helper import timer
@@ -17,7 +17,7 @@ def train():
     trg_lines = gen_lines('../data/mt/train.en')
     src_vocab = vocab(src_lines, 10)
     trg_vocab = vocab(trg_lines, 10)
-    itow = trg_vocab.itow
+    trg_itow = trg_vocab.itow
 
     attmt = AttentionMT(len(src_vocab), len(trg_vocab), 200, 100)
     attmt.use_gpu(0)
@@ -30,17 +30,16 @@ def train():
     for epoch in tqdm(range(n_epoch)):
         src_lines = gen_lines('../data/mt/train.de')
         trg_lines = gen_lines('../data/mt/train.en')
-        src_gen = gen_batch(src_lines, src_vocab, batch_size)
-        trg_gen = gen_batch(trg_lines, trg_vocab, batch_size)
-        for x_batch, t_batch in zip(src_gen, trg_gen):
+        src_batches = line2batch(src_lines, src_vocab, batch_size)
+        trg_batches = line2batch(trg_lines, trg_vocab, batch_size)
+        for x_batch, t_batch in zip(src_batches, trg_batches):
             attmt.zerograds()
             y_batch, loss = attmt(x_batch, t_batch, trg_vocab.wtoi)
-            word_id_list = [y.argmax(axis=1) for y in y_batch]
-            for i in range(len(t_batch)):
-                tqdm.write('epoch: ' + str(epoch) + ' [' + datetime.now().strftime("%Y/%m/%d %H:%M:%S") + ']: ' +\
-                        ' '.join([trg_vocab.itow[int(word_id_list[k][i])] for k in range(len(word_id_list))]))
             loss.backward()
             opt.update()
+            for line in batch2line(y_batch, trg_vocab):
+                tqdm.write('epoch: ' + str(epoch) + ' [' + datetime.now().strftime("%Y/%m/%d %H:%M:%S") + ']: ' + line)
+            exit()
     attmt.save_model('test.model')
 
 if __name__ == '__main__':
