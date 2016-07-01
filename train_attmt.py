@@ -5,11 +5,11 @@ from chainer import Variable as V
 from chainer import serializers
 from tqdm import tqdm
 
-from yasfmy.models import AttentionMT
-from yasfmy.preprocessing import gen_lines, line2batch, batch2line
-from yasfmy.wrapper import xp
-from yasfmy.vocabulary import Vocabulary as vocab
-from yasfmy.helper import timer
+from lib.models import AttentionMT
+from lib.preprocessing import gen_lines, line2batch, batch2line
+from lib.wrapper import xp
+from lib.vocabulary import Vocabulary as vocab
+from lib.helper import timer
 
 @timer
 def train():
@@ -25,7 +25,7 @@ def train():
     opt.setup(attmt)
 
     n_epoch = 10
-    batch_size = 200
+    batch_size = 150
 
     for epoch in tqdm(range(n_epoch)):
         src_lines = gen_lines('../data/mt/train.de')
@@ -39,7 +39,6 @@ def train():
             opt.update()
             for line in batch2line(y_batch, trg_vocab):
                 tqdm.write('epoch: ' + str(epoch) + ' [' + datetime.now().strftime("%Y/%m/%d %H:%M:%S") + ']: ' + line)
-            exit()
     attmt.save_model('test.model')
 
 if __name__ == '__main__':
