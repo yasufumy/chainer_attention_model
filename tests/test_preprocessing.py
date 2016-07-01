@@ -4,17 +4,17 @@ import unittest
 import io
 import re
 
-from preprocessing import gen_lines, gen_batch, fill_batch
+from preprocessing import gen_lines, line2batch, fill_batch
 from vocabulary import Vocabulary
 
 class PreprocessingTestCase(unittest.TestCase):
     def test_gen_lines(self):
         pass
 
-    def test_gen_batch(self):
+    def test_line2batch(self):
         lines = ['a', 'b', 'c']
         vocab = Vocabulary(lines, th=0)
-        batches = gen_batch(lines, vocab, 3)
+        batches = next(line2batch(lines, vocab, 3))[0].data
         lines = [[[1] + [vocab.wtoi[l]] + [2, -1]] for l in lines]
         for batch, line in zip(batches, lines):
             for b, l in zip(batch, line):
