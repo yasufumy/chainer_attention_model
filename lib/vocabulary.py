@@ -1,6 +1,8 @@
 from collections import defaultdict, Counter
 from itertools import chain, takewhile
 
+from config import START_TOKEN, END_TOKEN, UNKNOWN_TOKEN
+
 class Vocabulary:
     def __new__(cls, words_generator, th):
         obj = super().__new__(cls)
@@ -8,13 +10,13 @@ class Vocabulary:
         word_freq = Counter(chain.from_iterable((words_generator)))
 
         obj.__wtoi = defaultdict(lambda: 0)
-        obj.__wtoi['<unk>'] = 0
-        obj.__wtoi['<s>'] = 1
-        obj.__wtoi['</s>'] = 2
+        obj.__wtoi[UNKNOWN_TOKEN] = 0
+        obj.__wtoi[START_TOKEN] = 1
+        obj.__wtoi[END_TOKEN] = 2
         obj.__itow = []
-        obj.__itow.append('<unk>')
-        obj.__itow.append('<s>')
-        obj.__itow.append('</s>')
+        obj.__itow.append(UNKNOWN_TOKEN)
+        obj.__itow.append(START_TOKEN)
+        obj.__itow.append(END_TOKEN)
 
         i = 3
         for (k, v) in takewhile(lambda x: x[1] > th, word_freq.most_common()):

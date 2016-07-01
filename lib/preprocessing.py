@@ -4,6 +4,7 @@ import io
 from chainer import Variable as V
 
 from wrapper import xp
+from config import START_TOKEN, END_TOKEN
 
 def gen_lines(filename):
     with open(filename) as f:
@@ -14,8 +15,8 @@ def line2batch(lines, vocab, batch_size):
     batch = []
     wtoi = vocab.wtoi
     for line in lines:
-        batch.append([wtoi['<s>']]+
-                [wtoi[word] for word in line] + [wtoi['</s>']])
+        batch.append([wtoi[START_TOKEN]]+
+                [wtoi[word] for word in line] + [wtoi[END_TOKEN]])
         if len(batch) == batch_size:
             #yield fill_batch(batch)
             yield [V(word) for word in fill_batch(batch).T]

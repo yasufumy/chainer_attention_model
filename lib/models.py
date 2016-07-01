@@ -5,8 +5,7 @@ from chainer import cuda
 from chainer import serializers
 
 from wrapper import xp
-
-IGNORE_LABEL = -1
+from config import IGNORE_LABEL, START_TOKEN
 
 class BaseModel(chainer.Chain):
     def __call__(self):
@@ -116,7 +115,7 @@ class AttentionMT(BaseModel):
         # preparing
         batch_len = src[0].data.shape[0]
         hidden_init = xp.Zeros((batch_len, self.hidden_size), dtype=xp.float32)
-        y = xp.Array([trg_wtoi['<s>'] for _ in range(batch_len)], dtype=xp.int32)
+        y = xp.Array([trg_wtoi[START_TOKEN] for _ in range(batch_len)], dtype=xp.int32)
         # embeding words
         x_list = [F.tanh(self.emb(x)) for x in src]
         # encoding
