@@ -113,9 +113,9 @@ class AttentionMT(BaseModel):
 
     def __call__(self, src, trg, trg_wtoi):
         # preparing
-        batch_len = src[0].data.shape[0]
-        self.hidden_init = xp.Zeros((batch_len, self.hidden_size), dtype=xp.float32)
-        y = xp.Array([trg_wtoi[START_TOKEN] for _ in range(batch_len)], dtype=xp.int32)
+        batch_size = src[0].data.shape[0]
+        self.hidden_init = xp.Zeros((batch_size, self.hidden_size), dtype=xp.float32)
+        y = xp.Array([trg_wtoi[START_TOKEN] for _ in range(batch_size)], dtype=xp.int32)
         # embeding words
         x_list = [F.tanh(self.emb(x)) for x in src]
         # encoding
