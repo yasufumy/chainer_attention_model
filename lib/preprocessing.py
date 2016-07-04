@@ -1,10 +1,7 @@
-from itertools import chain
-import io
-
-from chainer import Variable as V
+from chainer import functions as F
 
 from wrapper import xp
-from config import START_TOKEN, END_TOKEN
+from config import START_TOKEN, END_TOKEN, IGNORE_LABEL
 
 def gen_lines(filename):
     with open(filename) as f:
@@ -18,15 +15,17 @@ def line2batch(lines, vocab, batch_size):
         batch.append([wtoi[START_TOKEN]]+
                 [wtoi[word] for word in line] + [wtoi[END_TOKEN]])
         if len(batch) == batch_size:
-            #yield fill_batch(batch)
-            yield [V(word) for word in fill_batch(batch).T]
+            yield fill_batch(batch)
             batch = []
     if batch:
-        yield [V(word) for word in fill_batch(batch).T]
+        yield fill_batch(batch)
 
-def fill_batch(batch, token=-1):
-    max_len = max(len(x) for x in batch)
-    return xp.array([x + [token] * (max_len - len(x) + 1) for x in batch], dtype=xp.int32)
+def fill_batch(batch, token=IGNORE_LABEL):
+    max_size = max(len(x) for x in batch)
+    filled_batch =  xp.array(
+                        [x + [token] * (max_size - len(x)) for x in batch],
+                        dtype=xp.int32)
+    return [words for words in F.transpose_sequence(filled_batch)]
 
 def batch2line(batches, vocab):
     itow = vocab.itow
