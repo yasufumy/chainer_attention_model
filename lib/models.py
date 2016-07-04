@@ -137,7 +137,7 @@ class AttentionMT(BaseModel):
     def forward_dec_train(self, trg, a_list, b_list, y):
         h = c = self.hidden_init
         y_batch = []
-        loss = xp.Zeros(None, dtype=xp.float32)
+        loss = xp.Array(0, dtype=xp.float32)
         for t in trg:
             ab = self.att(a_list, b_list, h)
             y, c, h = self.dec(y, c, h, ab)
