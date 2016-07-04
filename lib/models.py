@@ -7,6 +7,8 @@ from chainer import serializers
 from wrapper import xp
 from config import IGNORE_LABEL, START_TOKEN
 
+INF = float('inf')
+
 class BaseModel(chainer.Chain):
     def __call__(self):
         pass
@@ -70,19 +72,6 @@ class Attention(BaseModel):
         self.hidden_size = hidden_size
 
     def __call__(self, a_list, b_list, p):
-        #batch_size = p.data.shape[0]
-        #e_list = []
-        #sum_e = xp.Zeros((batch_size, 1), dtype=xp.float32)
-        #for a, b in zip(a_list, b_list):
-        #    w = F.tanh(self.aw(a) + self.bw(b) + self.pw(p))
-        #    e = F.exp(self.we(w))
-        #    e_list.append(e)
-        #    sum_e += e
-        #aa = bb = xp.Zeros((batch_size, self.hidden_size), dtype=xp.float32)
-        #for a, b, e in zip(a_list, b_list, e_list):
-        #    e /= sum_e
-        #    aa += F.reshape(F.batch_matmul(a, e), (batch_size, self.hidden_size))
-        #    bb += F.reshape(F.batch_matmul(b, e), (batch_size, self.hidden_size))
         batch_size = p.data.shape[0]
         sent_size = len(a_list)
         wp = F.expand_dims(self.pw(p), axis=1)
@@ -95,6 +84,7 @@ class Attention(BaseModel):
         wab = F.reshape(wab, (batch_size, sent_size, self.hidden_size))
         e = self.we(F.reshape(F.tanh(wab), (batch_size * sent_size, self.hidden_size)))
         e = F.reshape(e, (batch_size, sent_size))
+        e = F.where(e.data!=0, e, xp.ones(e.data.shape, dtype=xp.float32)*-INF)
         att = F.softmax(e)
         ab = F.batch_matmul(F.reshape(hab, (batch_size, 2 * self.hidden_size, sent_size)), att)
         return F.reshape(ab, (batch_size, 2 * self.hidden_size))
