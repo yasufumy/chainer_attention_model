@@ -15,6 +15,7 @@ class PreprocessingTestCase(unittest.TestCase):
         lines = ['a', 'b', 'c']
         vocab = Vocabulary(lines, th=0)
         batches = next(line2batch(lines, vocab, 3))[0].data
+        print(batches)
         lines = [[[1] + [vocab.wtoi[l]] + [2, -1]] for l in lines]
         for batch, line in zip(batches, lines):
             for b, l in zip(batch, line):
@@ -23,4 +24,4 @@ class PreprocessingTestCase(unittest.TestCase):
     def test_fill_batch(self):
         lines= [[1, 2, 3], [1, 2]]
         batch = fill_batch(lines)
-        self.assertEqual(batch[1][-1], -1)
+        self.assertEqual(batch[-1].data[-1], -1)
