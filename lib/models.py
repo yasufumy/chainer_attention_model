@@ -72,22 +72,25 @@ class Attention(BaseModel):
         self.hidden_size = hidden_size
 
     def __call__(self, a_list, b_list, p):
+        # preparing
         batch_size = p.data.shape[0]
         sent_size = len(a_list)
-        wp = F.expand_dims(self.pw(p), axis=1)
-        wp = F.broadcast_to(wp, (batch_size, sent_size, self.hidden_size))
-        wp = F.concat((wp, wp), axis=2)
-        a = F.concat(a_list, axis=0)
-        b = F.concat(b_list, axis=0)
-        hab = F.concat((a, b))
-        wab = self.abw(hab)
+        # expand pw(p) to size of a matrix of encoder outputs
+        matp = F.expand_dims(self.pw(p), axis=1)
+        matp = F.broadcast_to(matp, (batch_size, sent_size, self.hidden_size))
+        # make a matrix of encoder + decoder (batch_size * sent_size, 2 * hidden_size)
+        ab = F.concat((F.concat(a_list, axis=0), F.concat(b_list, axis=0)))
+        # apply a weight vector to a encoder matrix
+        wab = self.abw(ab)
         wab = F.reshape(wab, (batch_size, sent_size, self.hidden_size))
-        e = self.we(F.reshape(F.tanh(wab), (batch_size * sent_size, self.hidden_size)))
+        wab = F.where(wab.data!=0, wab, xp.ones(wab.data.shape, dtype=xp.float32)*-INF)
+        # apply a weight vector after calculating elementwise addtion (enc matrix + prev hidden output)
+        e = self.we(F.reshape(F.tanh(wab + matp), (batch_size * sent_size, self.hidden_size)))
         e = F.reshape(e, (batch_size, sent_size))
-        e = F.where(e.data!=0, e, xp.ones(e.data.shape, dtype=xp.float32)*-INF)
+        # weights how amount enc vector affects
         att = F.softmax(e)
-        ab = F.batch_matmul(F.reshape(hab, (batch_size, 2 * self.hidden_size, sent_size)), att)
-        return F.reshape(ab, (batch_size, 2 * self.hidden_size))
+        c = F.batch_matmul(F.reshape(ab, (batch_size, 2 * self.hidden_size, sent_size)), att)
+        return F.reshape(c, (batch_size, 2 * self.hidden_size))
 
 class AttentionMT(BaseModel):
     def __init__(self, src_size, trg_size, embed_size, hidden_size):
@@ -98,7 +101,6 @@ class AttentionMT(BaseModel):
             att = Attention(hidden_size),
             dec = Decoder(trg_size, embed_size, hidden_size)
         )
-        self.embed_size = embed_size
         self.hidden_size = hidden_size
 
     def __call__(self, src, trg, trg_wtoi):
