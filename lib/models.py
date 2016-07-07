@@ -19,10 +19,10 @@ class BaseModel(chainer.Chain):
 
     def save_model(self, filename):
         self.to_cpu()
-        serializers.save_npz(filename, self)
+        serializers.save_hdf5(filename, self)
 
     def load_model(self, filename):
-        pass
+        serializers.load_hdf5(filename, self)
 
 class Encoder(BaseModel):
     def __init__(self, embed_size, hidden_size):
