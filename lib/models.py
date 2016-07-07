@@ -5,7 +5,7 @@ from chainer import cuda
 from chainer import serializers
 
 from wrapper import xp
-from config import IGNORE_LABEL, START_TOKEN
+from config import IGNORE_LABEL, START_TOKEN, END_TOKEN
 
 INF = float('inf')
 
@@ -137,3 +137,24 @@ class AttentionMT(BaseModel):
             loss += F.softmax_cross_entropy(y, t)
             y = t
         return y_batch, loss
+
+    def test(self, src, trg, limit=20):
+        # preparing
+        batch_size = src[0].data.shape[0]
+        trg_wtoi = trg.wtoi
+        self.hidden_init = xp.Zeros((1, self.hidden_size), dtype=xp.float32)
+        y = xp.Array([trg_wtoi[START_TOKEN] for _ in range(batch_size)], dtype=xp.int32)
+        # embeding words
+        x_list = [F.tanh(self.emb(x)) for x in src]
+        a_list, b_list = self.forward_enc(x_list)
+        h = c = self.hidden_init
+        y_line = []
+        for _ in range(limit):
+            ab = self.att(a_list, b_list, h)
+            y, c, h = self.dec(y, c, h, ab)
+            w = trg.itow[int(y.data.argmax(axis=1))]
+            if w == END_TOKEN:
+                break
+            y_batch.append(w)
+            y = xp.Array(y.data.argmax(axis=1), dtype=xp.int32)
+        return y_line
