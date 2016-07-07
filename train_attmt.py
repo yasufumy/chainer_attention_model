@@ -1,9 +1,8 @@
 from datetime import datetime
+from argparse import ArgumentParser
 
 from chainer import optimizers, cuda
-from chainer import Variable as V
 from chainer import serializers
-from tqdm import tqdm
 
 from lib.models import AttentionMT
 from lib.preprocessing import gen_lines, line2batch, batch2line
