@@ -44,14 +44,15 @@ def train(args):
     return attmt
 
 def test(attmt, args):
-    src_lines = gen_lines(args.test_src)
-    trg_lines = gen_lines(args.test_trg)
+    src_lines = gen_lines(args.train_src)
+    trg_lines = gen_lines(args.train_trg)
     src_vocab = vocab(src_lines, args.unk)
     trg_vocab = vocab(trg_lines, args.unk)
+    attmt.use_gpu(args.gpu)
     for x_batch in line2batch(gen_lines(args.test_src), src_vocab, 1):
         y_batch = attmt.test(x_batch, trg_vocab)
         with open(args.output, 'a') as f:
-            f.write(' '.join(y_batch).replace('<s> ', '').replace(' </s>',  ''))
+            f.write(' '.join(y_batch).replace('<s> ', '').replace(' </s>',  '') + '\n')
 
 def parse_args():
     parser = ArgumentParser()
