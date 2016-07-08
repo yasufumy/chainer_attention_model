@@ -23,12 +23,12 @@ def line2batch(lines, vocab, batch_size):
 def fill_batch(batch, token=IGNORE_LABEL):
     max_size = max(len(x) for x in batch)
     filled_batch =  xp.array(
-                        [x + [token] * (max_size - len(x)) for x in batch],
+                        [x + [token] * (max_size - len(x) + 1) for x in batch],
                         dtype=xp.int32)
     return [words for words in F.transpose_sequence(filled_batch)]
 
 def batch2line(batches, vocab):
     itow = vocab.itow
     id_list = [batch.data.argmax(axis=1) for batch in batches]
-    for i in range(len(batches)):
+    for i in range(batches[0].data.shape[0]):
         yield ' '.join([itow[int(id_list[k][i])] for k in range(len(id_list))])

@@ -19,7 +19,7 @@ def train(args):
     trg_itow = trg_vocab.itow
 
     attmt = AttentionMT(len(src_vocab), len(trg_vocab), args.embed, args.hidden)
-    attmt.use_gpu(0)
+    attmt.use_gpu(args.gpu)
     opt = optimizers.AdaGrad(lr=0.01)
     opt.setup(attmt)
 
@@ -40,7 +40,7 @@ def train(args):
                 print('epoch: ' + str(epoch + 1) +
                         ' [' + datetime.now().strftime("%Y/%m/%d %H:%M:%S") +
                         ']: ' + line)
-    attmt.save_model('test.model')
+    attmt.save_model(args.model)
     return attmt
 
 def test(attmt, args):
