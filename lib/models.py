@@ -155,6 +155,6 @@ class AttentionMT(BaseModel):
             w = trg.itow[int(y.data.argmax(axis=1))]
             if w == END_TOKEN:
                 break
-            y_batch.append(w)
+            y_line.append(w)
             y = xp.Array(y.data.argmax(axis=1), dtype=xp.int32)
         return y_line
