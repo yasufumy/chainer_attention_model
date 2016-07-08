@@ -142,7 +142,7 @@ class AttentionMT(BaseModel):
         # preparing
         batch_size = src[0].data.shape[0]
         trg_wtoi = trg.wtoi
-        self.hidden_init = xp.Zeros((1, self.hidden_size), dtype=xp.float32)
+        self.hidden_init = xp.Zeros((batch_size, self.hidden_size), dtype=xp.float32)
         y = xp.Array([trg_wtoi[START_TOKEN] for _ in range(batch_size)], dtype=xp.int32)
         # embeding words
         x_list = [F.tanh(self.emb(x)) for x in src]
