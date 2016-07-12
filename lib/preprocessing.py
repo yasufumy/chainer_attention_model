@@ -15,17 +15,17 @@ def line2batch(lines, vocab, batch_size):
         batch.append([wtoi[START_TOKEN]]+
                 [wtoi[word] for word in line] + [wtoi[END_TOKEN]])
         if len(batch) == batch_size:
-            yield fill_batch(batch)
+            yield F.transpose_sequence(fill_batch(batch))
             batch = []
     if batch:
-        yield fill_batch(batch)
+        yield F.transpose_sequence(fill_batch(batch))
 
 def fill_batch(batch, token=IGNORE_LABEL):
     max_size = max(len(x) for x in batch)
     filled_batch =  xp.array(
                         [x + [token] * (max_size - len(x) + 1) for x in batch],
                         dtype=xp.int32)
-    return [words for words in F.transpose_sequence(filled_batch)]
+    return filled_batch
 
 def batch2line(batches, vocab):
     itow = vocab.itow
