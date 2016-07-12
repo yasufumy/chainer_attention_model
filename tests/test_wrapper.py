@@ -1,5 +1,4 @@
-import sys
-sys.path.append('..')
+import prepare
 import unittest
 from wrapper import xp
 from chainer import cuda

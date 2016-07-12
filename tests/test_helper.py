@@ -1,6 +1,6 @@
-import sys
-sys.path.append('..')
+import prepare
 import unittest
+import sys
 import io
 import re
 
