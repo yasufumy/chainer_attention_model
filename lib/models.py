@@ -119,7 +119,7 @@ class AttentionMT(BaseModel):
     def forward_enc(self, x_list):
         fc = fh = bc = bh = self.hidden_init
         fenc_list = benc_list = []
-        for fx, bx in zip(x_list, reversed(x_list)):
+        for fx, bx in zip(x_list, x_list[::-1]):
             fc, fh = self.fenc(fx, fc, fh)
             bc, bh = self.benc(bx, bc, bh)
             fenc_list.append(fh)
