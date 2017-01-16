@@ -83,10 +83,10 @@ class AttentionDecoder(BaseModel):
 class AttentionMT(BaseModel):
     def __init__(self, src_size, trg_size, embed_size, hidden_size):
         super().__init__(
-            emb = L.EmbedID(src_size, embed_size, IGNORE_LABEL),
-            fenc = Encoder(embed_size, hidden_size),
-            benc = Encoder(embed_size, hidden_size),
-            dec = AttentionDecoder(trg_size, embed_size, hidden_size)
+            embed = L.EmbedID(src_size, embed_size, IGNORE_LABEL),
+            f_encoder = Encoder(embed_size, hidden_size),
+            b_encoder = Encoder(embed_size, hidden_size),
+            decoder = AttentionDecoder(trg_size, embed_size, hidden_size)
         )
         self.hidden_size = hidden_size
 
@@ -95,30 +95,31 @@ class AttentionMT(BaseModel):
         batch_size = src[0].data.shape[0]
         self.hidden_init = xp.Zeros((batch_size, self.hidden_size), dtype=xp.float32)
         y = xp.Array([trg_wtoi[START_TOKEN] for _ in range(batch_size)], dtype=xp.int32)
-        # embeding words
-        x_list = [F.tanh(self.emb(x)) for x in src]
         # encoding
-        a_list, b_list = self.forward_enc(x_list)
+        a_list, b_list = self.encode(src)
         # attention
         y_batch, loss = self.forward_dec_train(trg, a_list, b_list, y)
         return y_batch, loss
 
-    def forward_enc(self, x_list):
-        fc = fh = bc = bh = self.hidden_init
-        fenc_list = benc_list = []
-        for fx, bx in zip(x_list, x_list[::-1]):
-            fc, fh = self.fenc(fx, fc, fh)
-            bc, bh = self.benc(bx, bc, bh)
-            fenc_list.append(fh)
-            benc_list.append(bh)
-        return fenc_list, benc_list
+    def encode(self, src):
+        fm = fh = bm = bh = self.hidden_init
+        h_forward = []
+        h_backword = []
+        for fx, bx in zip(src, src[::-1]):
+            embeded_fx = F.tanh(self.embed(fx))
+            embeded_bx = F.tanh(self.embed(bx))
+            fm, fh = self.f_encoder(embeded_fx, fm, fh)
+            bm, bh = self.b_encoder(embeded_bx, bm, bh)
+            h_forward.append(fh)
+            h_backword.append(bh)
+        return h_forward, h_backword
 
     def forward_dec_train(self, trg, a_list, b_list, y):
         h = c = self.hidden_init
         y_batch = []
         loss = xp.Array(0, dtype=xp.float32)
         for t in trg:
-            y, c, h = self.dec(y, c, h, a_list, b_list)
+            y, c, h = self.decoder(y, c, h, a_list, b_list)
             y_batch.append(y)
             loss += F.softmax_cross_entropy(y, t)
             y = t
@@ -137,7 +138,7 @@ class AttentionMT(BaseModel):
         y_line = []
         for _ in range(limit):
             ab = self.att(a_list, b_list, h)
-            y, c, h = self.dec(y, c, h, ab)
+            y, c, h = self.decoder(y, c, h, ab)
             w = trg.itow[int(y.data.argmax(axis=1))]
             if w == END_TOKEN:
                 break
