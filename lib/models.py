@@ -63,33 +63,35 @@ class Attention(BaseModel):
     def __init__(self, hidden_size):
         super().__init__(
             # forward + backward encoder weight vector
-            abw = L.Linear(2 * hidden_size, hidden_size),
+            U_a = L.Linear(2 * hidden_size, hidden_size),
             # previous hidden output weight vector
-            pw = L.Linear(hidden_size, hidden_size),
+            W_a = L.Linear(hidden_size, hidden_size),
             # attention output weight vector
-            we = L.Linear(hidden_size, 1),
+            v_a = L.Linear(hidden_size, 1),
         )
         self.hidden_size = hidden_size
 
-    def __call__(self, a_list, b_list, p):
+    def __call__(self, a_list, b_list, s):
         # preparing
-        batch_size = p.data.shape[0]
+        batch_size = s.data.shape[0]
         sent_size = len(a_list)
         # expand pw(p) to size of a matrix of encoder outputs
-        matp = F.expand_dims(self.pw(p), axis=1)
-        matp = F.broadcast_to(matp, (batch_size, sent_size, self.hidden_size))
+        weighted_s = F.expand_dims(self.W_a(s), axis=1)
+        weighted_s = F.broadcast_to(weighted_s, (batch_size, sent_size, self.hidden_size))
         # make a matrix of encoder + decoder (batch_size * sent_size, 2 * hidden_size)
-        ab = F.concat((F.concat(a_list, axis=0), F.concat(b_list, axis=0)))
+        h = F.concat((F.concat(a_list, axis=0), F.concat(b_list, axis=0)))
         # apply a weight vector to a encoder matrix
-        wab = self.abw(ab)
-        wab = F.reshape(wab, (batch_size, sent_size, self.hidden_size))
-        wab = F.where(wab.data!=0, wab, xp.ones(wab.data.shape, dtype=xp.float32)*-INF)
+        weighted_h = self.U_a(h)
+        weighted_h = F.reshape(weighted_h, (batch_size, sent_size, self.hidden_size))
+        weighted_h = F.where(weighted_h.data!=0, weighted_h,
+                             xp.ones(weighted_h.data.shape, dtype=xp.float32)*-INF)
         # apply a weight vector after calculating elementwise addtion (enc matrix + prev hidden output)
-        e = self.we(F.reshape(F.tanh(wab + matp), (batch_size * sent_size, self.hidden_size)))
+        e = self.v_a(F.reshape(F.tanh(weighted_s + weighted_h),
+                   (batch_size * sent_size, self.hidden_size)))
         e = F.reshape(e, (batch_size, sent_size))
         # weights how amount enc vector affects
-        att = F.softmax(e)
-        c = F.batch_matmul(F.reshape(ab, (batch_size, 2 * self.hidden_size, sent_size)), att)
+        alpha = F.softmax(e)
+        c = F.batch_matmul(F.reshape(h, (batch_size, 2 * self.hidden_size, sent_size)), alpha)
         return F.reshape(c, (batch_size, 2 * self.hidden_size))
 
 class AttentionMT(BaseModel):
