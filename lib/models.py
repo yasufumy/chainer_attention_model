@@ -94,14 +94,57 @@ class Attention(BaseModel):
         c = F.batch_matmul(F.reshape(h, (batch_size, 2 * self.hidden_size, sent_size)), alpha)
         return F.reshape(c, (batch_size, 2 * self.hidden_size))
 
+class AttentionDecoder(BaseModel):
+    def __init__(self, vocab_size, embed_size, hidden_size):
+        super().__init__(
+            # Weights of Decoder
+            E = L.EmbedID(vocab_size, embed_size, IGNORE_LABEL),
+            W = L.Linear(embed_size, 4 * hidden_size),
+            U = L.Linear(hidden_size, 4 * hidden_size),
+            C = L.Linear(2 * hidden_size, 4 * hidden_size),
+            W_o = L.Linear(hidden_size, vocab_size),
+            # Weights of Attention
+            U_a = L.Linear(2 * hidden_size, hidden_size),
+            W_a = L.Linear(hidden_size, hidden_size),
+            v_a = L.Linear(hidden_size, 1),
+        )
+        self.hidden_size = hidden_size
+
+    def _attention(self, h_forward, h_backword, s):
+        batch_size = s.data.shape[0]
+        sentence_size = len(h_forward)
+
+        weighted_s = F.expand_dims(self.W_a(s), axis=1)
+        weighted_s = F.broadcast_to(weighted_s,
+                                    (batch_size, sentence_size, self.hidden_size))
+        h = F.concat((F.concat(h_forward, axis=0), F.concat(h_backword, axis=0)))
+        weighted_h = self.U_a(h)
+        weighted_h = F.reshape(weighted_h, (batch_size, sentence_size, self.hidden_size))
+        weighted_h = F.where(weighted_h.data!=0, weighted_h,
+                             self.xp.ones(weighted_h.data.shape, dtype=self.xp.float32)*-INF)
+
+        e = self.v_a(F.reshape(F.tanh(weighted_s + weighted_h),
+                               (batch_size * sentence_size, self.hidden_size)))
+        e = F.reshape(e, (batch_size, sentence_size))
+        alpha = F.softmax(e)
+        c = F.batch_matmul(F.reshape(h, (batch_size, 2 * self.hidden_size, sentence_size)), alpha)
+        return F.reshape(c, (batch_size, 2 * self.hidden_size))
+
+    def __call__(self, y, m, s, h_forward, h_backword):
+        # m is memory cell of lstm, s is previous hidden output
+        # calculate attention
+        c = self._attention(h_forward, h_backword, s)
+        # decode once
+        m, s = F.lstm(m, self.W(F.tanh(self.E(y))) + self.U(s) + self.C(c))
+        return self.W_o(s), m, s
+
 class AttentionMT(BaseModel):
     def __init__(self, src_size, trg_size, embed_size, hidden_size):
         super().__init__(
             emb = L.EmbedID(src_size, embed_size, IGNORE_LABEL),
             fenc = Encoder(embed_size, hidden_size),
             benc = Encoder(embed_size, hidden_size),
-            att = Attention(hidden_size),
-            dec = Decoder(trg_size, embed_size, hidden_size)
+            dec = AttentionDecoder(trg_size, embed_size, hidden_size)
         )
         self.hidden_size = hidden_size
 
@@ -133,8 +176,7 @@ class AttentionMT(BaseModel):
         y_batch = []
         loss = xp.Array(0, dtype=xp.float32)
         for t in trg:
-            ab = self.att(a_list, b_list, h)
-            y, c, h = self.dec(y, c, h, ab)
+            y, c, h = self.dec(y, c, h, a_list, b_list)
             y_batch.append(y)
             loss += F.softmax_cross_entropy(y, t)
             y = t
