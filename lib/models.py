@@ -28,13 +28,13 @@ class Encoder(BaseModel):
     def __init__(self, embed_size, hidden_size):
         super().__init__(
             # input weight vector of {input, output, forget} gate and input
-            w = L.Linear(embed_size, 4 * hidden_size),
+            W = L.Linear(embed_size, 4 * hidden_size),
             # hidden weight vector of {input, output, forget} gate and input
-            v = L.Linear(hidden_size, 4 * hidden_size),
+            U = L.Linear(hidden_size, 4 * hidden_size),
         )
 
-    def __call__(self, x, c, h):
-        return F.lstm(c, self.w(x) + self.v(h))
+    def __call__(self, embeded_x, m, h):
+        return F.lstm(m, self.W(embeded_x) + self.U(h))
 
 class AttentionDecoder(BaseModel):
     def __init__(self, vocab_size, embed_size, hidden_size):
