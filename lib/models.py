@@ -36,64 +36,6 @@ class Encoder(BaseModel):
     def __call__(self, x, c, h):
         return F.lstm(c, self.w(x) + self.v(h))
 
-class Decoder(BaseModel):
-    def __init__(self, vocab_size, embed_size, hidden_size):
-        super().__init__(
-            # embedding previous output
-            ye = L.EmbedID(vocab_size, embed_size, IGNORE_LABEL),
-            # input(previous output) weight vector
-            eh = L.Linear(embed_size, 4 * hidden_size),
-            # hidden weight vector
-            hh = L.Linear(hidden_size, 4 * hidden_size),
-            # forward encoder weight vector
-            abh = L.Linear(2 * hidden_size, 4 * hidden_size),
-            # decoder weight weight vector
-            hf = L.Linear(hidden_size, embed_size),
-            # output weight vector
-            fy = L.Linear(embed_size, vocab_size)
-        )
-
-    def __call__(self, y, c, h, ab):
-        e = F.tanh(self.ye(y))
-        c, h = F.lstm(c, self.eh(e) + self.hh(h) + self.abh(ab))
-        f = F.tanh(self.hf(h))
-        return self.fy(f), c, h
-
-class Attention(BaseModel):
-    def __init__(self, hidden_size):
-        super().__init__(
-            # forward + backward encoder weight vector
-            U_a = L.Linear(2 * hidden_size, hidden_size),
-            # previous hidden output weight vector
-            W_a = L.Linear(hidden_size, hidden_size),
-            # attention output weight vector
-            v_a = L.Linear(hidden_size, 1),
-        )
-        self.hidden_size = hidden_size
-
-    def __call__(self, a_list, b_list, s):
-        # preparing
-        batch_size = s.data.shape[0]
-        sent_size = len(a_list)
-        # expand pw(p) to size of a matrix of encoder outputs
-        weighted_s = F.expand_dims(self.W_a(s), axis=1)
-        weighted_s = F.broadcast_to(weighted_s, (batch_size, sent_size, self.hidden_size))
-        # make a matrix of encoder + decoder (batch_size * sent_size, 2 * hidden_size)
-        h = F.concat((F.concat(a_list, axis=0), F.concat(b_list, axis=0)))
-        # apply a weight vector to a encoder matrix
-        weighted_h = self.U_a(h)
-        weighted_h = F.reshape(weighted_h, (batch_size, sent_size, self.hidden_size))
-        weighted_h = F.where(weighted_h.data!=0, weighted_h,
-                             xp.ones(weighted_h.data.shape, dtype=xp.float32)*-INF)
-        # apply a weight vector after calculating elementwise addtion (enc matrix + prev hidden output)
-        e = self.v_a(F.reshape(F.tanh(weighted_s + weighted_h),
-                   (batch_size * sent_size, self.hidden_size)))
-        e = F.reshape(e, (batch_size, sent_size))
-        # weights how amount enc vector affects
-        alpha = F.softmax(e)
-        c = F.batch_matmul(F.reshape(h, (batch_size, 2 * self.hidden_size, sent_size)), alpha)
-        return F.reshape(c, (batch_size, 2 * self.hidden_size))
-
 class AttentionDecoder(BaseModel):
     def __init__(self, vocab_size, embed_size, hidden_size):
         super().__init__(
