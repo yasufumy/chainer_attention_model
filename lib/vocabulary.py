@@ -1,7 +1,7 @@
 from collections import defaultdict, Counter
 from itertools import chain, takewhile
 
-from config import START_TOKEN, END_TOKEN, UNKNOWN_TOKEN
+from config import START_TOKEN, END_TOKEN, UNKNOWN_TOKEN, UNKNOWN_LABEL
 
 class Vocabulary:
     def __new__(cls, words_generator, th=5):
@@ -10,7 +10,7 @@ class Vocabulary:
         word_freq = Counter(chain.from_iterable((words_generator)))
 
         obj.wtoi = defaultdict(lambda: 0)
-        obj.wtoi[UNKNOWN_TOKEN] = 0
+        obj.wtoi[UNKNOWN_TOKEN] = UNKNOWN_LABEL
         obj.wtoi[START_TOKEN] = 1
         obj.wtoi[END_TOKEN] = 2
         obj.itow = []
