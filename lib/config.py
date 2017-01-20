@@ -1,4 +1,5 @@
 IGNORE_LABEL = -1
+UNKNOWN_LABEL = 0
 START_TOKEN = '<s>'
 END_TOKEN = '</s>'
 UNKNOWN_TOKEN = '<unk>'

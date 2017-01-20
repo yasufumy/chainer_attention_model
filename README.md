@@ -1,5 +1,16 @@
 # A Neural Attention Model for Machine Translation
 
+## Setup
+
+```sh
+$ git clone https://github.com/yasfmy/chainer_attention_model.git
+$ cd chainer_attention_model
+$ git submodule init
+$ git submodule update
+$ cd tools
+$ python setup.py install
+```
+
 ## Usage
 
 ```sh

@@ -3,12 +3,16 @@ from argparse import ArgumentParser
 
 from chainer import optimizers, cuda
 from chainer import serializers
+import numpy as np
+from tools.iterator import TextIterator
+from tools.text.preprocessing import OneOfMEncoder
 
 from lib.models import AttentionMT
 from lib.preprocessing import gen_lines, line2batch, batch2line
 from lib.wrapper import xp
 from lib.vocabulary import Vocabulary as vocab
 from lib.helper import timer
+from lib.config import UNKNOWN_LABEL
 
 @timer
 def train(args):
@@ -26,11 +30,15 @@ def train(args):
     n_epoch = args.epoch
     batch_size = args.batch
 
+    one_of_m = OneOfMEncoder(src_vocab.wtoi, UNKNOWN_LABEL)
+    src_train = [one_of_m.encode(s) for s in gen_lines(args.train_src)]
+    one_of_m = OneOfMEncoder(trg_vocab.wtoi, UNKNOWN_LABEL)
+    trg_train = [one_of_m.encode(s) for s in gen_lines(args.train_trg)]
+
     for epoch in range(n_epoch):
-        src_lines = gen_lines(args.train_src)
-        trg_lines = gen_lines(args.train_trg)
-        src_batches = line2batch(src_lines, src_vocab, batch_size)
-        trg_batches = line2batch(trg_lines, trg_vocab, batch_size)
+        order = np.random.permutation(len(src_train))
+        src_batches = TextIterator(src_train, batch_size, order=order)
+        trg_batches = TextIterator(trg_train, batch_size, order=order)
         for x_batch, t_batch in zip(src_batches, trg_batches):
             attmt.zerograds()
             y_batch, loss = attmt(x_batch, t_batch, trg_vocab.wtoi)
