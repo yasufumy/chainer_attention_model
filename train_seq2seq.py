@@ -40,7 +40,7 @@ def train(args):
         src_batches = TextIterator(src_train, batch_size, order=order)
         trg_batches = TextIterator(trg_train, batch_size, order=order)
         for x_batch, t_batch in zip(src_batches, trg_batches):
-            model.zerograds()
+            model.cleargrads()
             y_batch, loss = model(x_batch, t_batch, trg_vocab.wtoi)
             loss.backward()
             opt.update()
