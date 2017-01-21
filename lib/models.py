@@ -7,7 +7,7 @@ from chainer import serializers
 from wrapper import xp
 from config import IGNORE_LABEL, START_TOKEN, END_TOKEN
 
-INF = float('inf')
+MINUS_INF = - float('inf')
 
 class BaseModel(chainer.Chain):
     def __call__(self):
@@ -62,8 +62,9 @@ class AttentionDecoder(BaseModel):
         h = F.concat((F.concat(h_forward, axis=0), F.concat(h_backword, axis=0)))
         weighted_h = self.U_a(h)
         weighted_h = F.reshape(weighted_h, (batch_size, sentence_size, self.hidden_size))
+        xp = self.xp
         weighted_h = F.where(weighted_h.data!=0, weighted_h,
-                             self.xp.ones(weighted_h.data.shape, dtype=self.xp.float32)*-INF)
+                             xp.full(weighted_h.shape, MINUS_INF, dtype=xp.float32))
 
         e = self.v_a(F.reshape(F.tanh(weighted_s + weighted_h),
                                (batch_size * sentence_size, self.hidden_size)))
@@ -80,7 +81,7 @@ class AttentionDecoder(BaseModel):
         m, s = F.lstm(m, self.W(F.tanh(self.E(y))) + self.U(s) + self.C(c))
         return self.W_o(s), m, s
 
-class AttentionMT(BaseModel):
+class Seq2SeqAttention(BaseModel):
     def __init__(self, src_size, trg_size, embed_size, hidden_size):
         super().__init__(
             embed = L.EmbedID(src_size, embed_size, IGNORE_LABEL),
