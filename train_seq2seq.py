@@ -7,7 +7,7 @@ import numpy as np
 from tools.iterator import TextIterator
 from tools.text.preprocessing import OneOfMEncoder
 
-from lib.models import AttentionMT
+from lib.models import Seq2SeqAttention
 from lib.preprocessing import gen_lines, line2batch, batch2line
 from lib.wrapper import xp
 from lib.vocabulary import Vocabulary as vocab
@@ -22,10 +22,10 @@ def train(args):
     trg_vocab = vocab(trg_lines, args.unk)
     trg_itow = trg_vocab.itow
 
-    attmt = AttentionMT(len(src_vocab), len(trg_vocab), args.embed, args.hidden)
-    attmt.use_gpu(args.gpu)
+    model = Seq2SeqAttention(len(src_vocab), len(trg_vocab), args.embed, args.hidden)
+    model.use_gpu(args.gpu)
     opt = optimizers.AdaGrad(lr=0.01)
-    opt.setup(attmt)
+    opt.setup(model)
 
     n_epoch = args.epoch
     batch_size = args.batch
@@ -40,25 +40,25 @@ def train(args):
         src_batches = TextIterator(src_train, batch_size, order=order)
         trg_batches = TextIterator(trg_train, batch_size, order=order)
         for x_batch, t_batch in zip(src_batches, trg_batches):
-            attmt.zerograds()
-            y_batch, loss = attmt(x_batch, t_batch, trg_vocab.wtoi)
+            model.zerograds()
+            y_batch, loss = model(x_batch, t_batch, trg_vocab.wtoi)
             loss.backward()
             opt.update()
             for line in batch2line(y_batch, trg_vocab):
                 print('epoch: ' + str(epoch + 1) +
                         ' [' + datetime.now().strftime("%Y/%m/%d %H:%M:%S") +
                         ']: ' + line)
-    attmt.save_model(args.model)
-    return attmt
+    model.save_model(args.model)
+    return model
 
-def test(attmt, args):
+def test(model, args):
     src_lines = gen_lines(args.train_src)
     trg_lines = gen_lines(args.train_trg)
     src_vocab = vocab(src_lines, args.unk)
     trg_vocab = vocab(trg_lines, args.unk)
-    attmt.use_gpu(args.gpu)
+    model.use_gpu(args.gpu)
     for x_batch in line2batch(gen_lines(args.test_src), src_vocab, 1):
-        y_batch = attmt.test(x_batch, trg_vocab)
+        y_batch = model.test(x_batch, trg_vocab)
         with open(args.output, 'a') as f:
             f.write(' '.join(y_batch).replace('<s> ', '').replace(' </s>',  '') + '\n')
 
@@ -81,7 +81,7 @@ def parse_args():
 if __name__ == '__main__':
     try:
         args = parse_args()
-        attmt = train(args)
-        test(attmt, args)
+        model = train(args)
+        test(model, args)
     except KeyboardInterrupt:
         pass
