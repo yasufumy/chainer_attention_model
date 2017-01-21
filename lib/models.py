@@ -81,7 +81,7 @@ class AttentionDecoder(BaseModel):
         m, s = F.lstm(m, self.W(F.tanh(self.E(y))) + self.U(s) + self.C(c))
         return self.W_o(s), m, s
 
-class AttentionMT(BaseModel):
+class Seq2SeqAttention(BaseModel):
     def __init__(self, src_size, trg_size, embed_size, hidden_size):
         super().__init__(
             embed = L.EmbedID(src_size, embed_size, IGNORE_LABEL),
