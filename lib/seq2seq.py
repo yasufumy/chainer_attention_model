@@ -4,7 +4,6 @@ import chainer.links as L
 from chainer import cuda
 from chainer import serializers
 
-from wrapper import xp
 from config import IGNORE_LABEL, START_TOKEN, END_TOKEN
 
 MINUS_INF = - float('inf')
