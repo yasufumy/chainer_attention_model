@@ -12,7 +12,7 @@ from lib.preprocessing import gen_lines, line2batch, batch2line
 from lib.wrapper import xp
 from lib.vocabulary import Vocabulary as vocab
 from lib.helper import timer
-from lib.config import UNKNOWN_LABEL
+from lib.config import UNKNOWN_LABEL, START_TOKEN, END_TOKEN
 
 @timer
 def train(args):
@@ -22,7 +22,8 @@ def train(args):
     trg_vocab = vocab(trg_lines, args.unk)
     trg_itow = trg_vocab.itow
 
-    model = Seq2SeqAttention(len(src_vocab), len(trg_vocab), args.embed, args.hidden)
+    model = Seq2SeqAttention(len(src_vocab), len(trg_vocab), args.embed, args.hidden,
+                             trg_vocab.wtoi[START_TOKEN], trg_vocab.wtoi[END_TOKEN])
     model.use_gpu(args.gpu)
     opt = optimizers.AdaGrad(lr=0.01)
     opt.setup(model)
@@ -35,13 +36,15 @@ def train(args):
     one_of_m = OneOfMEncoder(trg_vocab.wtoi, UNKNOWN_LABEL)
     trg_train = [one_of_m.encode(s) for s in gen_lines(args.train_trg)]
 
+    N = len(src_train)
+
     for epoch in range(n_epoch):
-        order = np.random.permutation(len(src_train))
+        order = np.random.permutation(N)
         src_batches = TextIterator(src_train, batch_size, order=order)
         trg_batches = TextIterator(trg_train, batch_size, order=order)
         for x_batch, t_batch in zip(src_batches, trg_batches):
             model.cleargrads()
-            y_batch, loss = model(x_batch, t_batch, trg_vocab.wtoi)
+            loss, y_batch = model.loss(x_batch, t_batch)
             loss.backward()
             opt.update()
             for line in batch2line(y_batch, trg_vocab):
