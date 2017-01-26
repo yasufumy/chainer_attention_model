@@ -10,8 +10,7 @@ from tools.text.preprocessing import OneOfMEncoder
 from tools.iterable import transpose
 
 from lib.seq2seq import Seq2SeqAttention
-from lib.preprocessing import gen_lines, line2batch, batch2line
-from lib.wrapper import xp
+from lib.preprocessing import gen_lines
 from lib.vocabulary import Vocabulary as vocab
 from lib.helper import timer
 from lib.config import UNKNOWN_LABEL, START_TOKEN, END_TOKEN
