@@ -43,6 +43,9 @@ class AttentionDecoder(BaseModel):
             W = L.Linear(embed_size, 4 * hidden_size),
             U = L.Linear(hidden_size, 4 * hidden_size),
             C = L.Linear(2 * hidden_size, 4 * hidden_size),
+            U_o = L.Linear(hidden_size, hidden_size),
+            V_o = L.Linear(embed_size, hidden_size),
+            C_o = L.Linear(2 * hidden_size, hidden_size),
             W_o = L.Linear(hidden_size, vocab_size),
             # Weights of Attention
             U_a = L.Linear(2 * hidden_size, hidden_size),
@@ -77,8 +80,10 @@ class AttentionDecoder(BaseModel):
         # calculate attention
         c = self._attention(h_forward, h_backword, s)
         # decode once
-        m, s = F.lstm(m, self.W(F.tanh(self.E(y))) + self.U(s) + self.C(c))
-        return self.W_o(s), m, s
+        embeded_y = self.E(y)
+        m, s = F.lstm(m, self.W(F.tanh(embeded_y)) + self.U(s) + self.C(c))
+        t = self.U_o(s) + self.V_o(embeded_y) + self.C_o(c)
+        return self.W_o(t), m, s
 
 class Seq2SeqAttention(BaseModel):
     def __init__(self, src_size, trg_size, embed_size, hidden_size,
@@ -134,7 +139,7 @@ class Seq2SeqAttention(BaseModel):
         y_batch = []
         loss = 0
         for t in trg:
-            y, c, s = self.decoder(y, m, s, h_forward, h_backword)
+            y, m, s = self.decoder(y, m, s, h_forward, h_backword)
             y_batch.append(y.data.argmax(1).tolist())
             loss += F.softmax_cross_entropy(y, t)
             y = t
@@ -148,7 +153,7 @@ class Seq2SeqAttention(BaseModel):
         end_token_id = self.end_token_id
         xp = self.xp
         for _ in range(limit):
-            y, c, s = self.decoder(y, m, s, h_forward, h_backword)
+            y, m, s = self.decoder(y, m, s, h_forward, h_backword)
             p = y.data.argmax(1)
             if all(p == end_token_id):
                 break
