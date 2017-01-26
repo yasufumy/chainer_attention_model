@@ -82,28 +82,33 @@ class AttentionDecoder(BaseModel):
         return self.W_o(s), m, s
 
 class Seq2SeqAttention(BaseModel):
-    def __init__(self, src_size, trg_size, embed_size, hidden_size):
+    def __init__(self, src_size, trg_size, embed_size, hidden_size,
+                 start_token_id, end_token_id):
         super().__init__(
             embed = L.EmbedID(src_size, embed_size, IGNORE_LABEL),
             f_encoder = Encoder(embed_size, hidden_size),
             b_encoder = Encoder(embed_size, hidden_size),
+            W_s = L.Linear(hidden_size, hidden_size),
             decoder = AttentionDecoder(trg_size, embed_size, hidden_size)
         )
         self.hidden_size = hidden_size
+        self.start_token_id = start_token_id
+        self.end_token_id = end_token_id
 
-    def __call__(self, src, trg, trg_wtoi):
+    def loss(self, src, trg):
         # preparing
-        batch_size = src[0].data.shape[0]
-        self.hidden_init = xp.Zeros((batch_size, self.hidden_size), dtype=xp.float32)
-        y = xp.Array([trg_wtoi[START_TOKEN] for _ in range(batch_size)], dtype=xp.int32)
+        batch_size = src[0].shape[0]
+        self.current_batch_size = batch_size
+        self.initial_state = chainer.Variable(xp.zeros(
+                            (batch_size, self.hidden_size), dtype=xp.float32))
         # encoding
-        a_list, b_list = self.encode(src)
-        # attention
-        y_batch, loss = self.forward_dec_train(trg, a_list, b_list, y)
-        return y_batch, loss
+        h_forward, h_backword = self.encode(src)
+        # decoding with attention
+        loss, y_batch = self.decode_train(trg, h_forward, h_backword)
+        return loss, y_batch
 
     def encode(self, src):
-        fm = fh = bm = bh = self.hidden_init
+        fm = fh = bm = bh = self.initial_state
         h_forward = []
         h_backword = []
         for fx, bx in zip(src, src[::-1]):
@@ -115,16 +120,19 @@ class Seq2SeqAttention(BaseModel):
             h_backword.append(bh)
         return h_forward, h_backword
 
-    def forward_dec_train(self, trg, a_list, b_list, y):
-        h = c = self.hidden_init
+    def decode_train(self, trg, h_forward, h_backword):
+        m = self.initial_state
+        s = F.tanh(self.W_s(h_backword[0]))
+        y = chainer.Variable(xp.array([self.start_token_id] * self.current_batch_size,
+                                      dtype=xp.int32))
         y_batch = []
-        loss = xp.Array(0, dtype=xp.float32)
+        loss = 0
         for t in trg:
-            y, c, h = self.decoder(y, c, h, a_list, b_list)
+            y, c, s = self.decoder(y, m, s, h_forward, h_backword)
             y_batch.append(y)
             loss += F.softmax_cross_entropy(y, t)
             y = t
-        return y_batch, loss
+        return loss, y_batch
 
     def test(self, src, trg, limit=20):
         # preparing
