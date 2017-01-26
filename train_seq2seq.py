@@ -7,7 +7,7 @@ import numpy as np
 from tools.iterator import TextIterator
 from tools.text.preprocessing import OneOfMEncoder
 
-from lib.models import Seq2SeqAttention
+from lib.seq2seq import Seq2SeqAttention
 from lib.preprocessing import gen_lines, line2batch, batch2line
 from lib.wrapper import xp
 from lib.vocabulary import Vocabulary as vocab
