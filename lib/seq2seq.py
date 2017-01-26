@@ -136,7 +136,7 @@ class Seq2SeqAttention(BaseModel):
         loss = 0
         for t in trg:
             y, c, s = self.decoder(y, m, s, h_forward, h_backword)
-            y_batch.append(y)
+            y_batch.append(y.data.argmax(1).tolist())
             loss += F.softmax_cross_entropy(y, t)
             y = t
         return loss, y_batch
