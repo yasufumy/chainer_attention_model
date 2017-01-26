@@ -4,7 +4,6 @@ import chainer.links as L
 from chainer import cuda
 from chainer import serializers
 
-from wrapper import xp
 from config import IGNORE_LABEL, START_TOKEN, END_TOKEN
 
 MINUS_INF = - float('inf')
@@ -44,6 +43,9 @@ class AttentionDecoder(BaseModel):
             W = L.Linear(embed_size, 4 * hidden_size),
             U = L.Linear(hidden_size, 4 * hidden_size),
             C = L.Linear(2 * hidden_size, 4 * hidden_size),
+            U_o = L.Linear(hidden_size, hidden_size),
+            V_o = L.Linear(embed_size, hidden_size),
+            C_o = L.Linear(2 * hidden_size, hidden_size),
             W_o = L.Linear(hidden_size, vocab_size),
             # Weights of Attention
             U_a = L.Linear(2 * hidden_size, hidden_size),
@@ -78,32 +80,47 @@ class AttentionDecoder(BaseModel):
         # calculate attention
         c = self._attention(h_forward, h_backword, s)
         # decode once
-        m, s = F.lstm(m, self.W(F.tanh(self.E(y))) + self.U(s) + self.C(c))
-        return self.W_o(s), m, s
+        embeded_y = self.E(y)
+        m, s = F.lstm(m, self.W(F.tanh(embeded_y)) + self.U(s) + self.C(c))
+        t = self.U_o(s) + self.V_o(embeded_y) + self.C_o(c)
+        return self.W_o(t), m, s
 
 class Seq2SeqAttention(BaseModel):
-    def __init__(self, src_size, trg_size, embed_size, hidden_size):
+    def __init__(self, src_size, trg_size, embed_size, hidden_size,
+                 start_token_id, end_token_id):
         super().__init__(
             embed = L.EmbedID(src_size, embed_size, IGNORE_LABEL),
             f_encoder = Encoder(embed_size, hidden_size),
             b_encoder = Encoder(embed_size, hidden_size),
+            W_s = L.Linear(hidden_size, hidden_size),
             decoder = AttentionDecoder(trg_size, embed_size, hidden_size)
         )
         self.hidden_size = hidden_size
+        self.start_token_id = start_token_id
+        self.end_token_id = end_token_id
 
-    def __call__(self, src, trg, trg_wtoi):
+    def loss(self, src, trg):
         # preparing
-        batch_size = src[0].data.shape[0]
-        self.hidden_init = xp.Zeros((batch_size, self.hidden_size), dtype=xp.float32)
-        y = xp.Array([trg_wtoi[START_TOKEN] for _ in range(batch_size)], dtype=xp.int32)
+        batch_size = src[0].shape[0]
+        self.prepare(batch_size)
         # encoding
-        a_list, b_list = self.encode(src)
-        # attention
-        y_batch, loss = self.forward_dec_train(trg, a_list, b_list, y)
-        return y_batch, loss
+        h_forward, h_backword = self.encode(src)
+        # decoding with attention
+        loss, y_batch = self.decode_train(trg, h_forward, h_backword)
+        return loss, y_batch
+
+    def inference(self, src, limit=20):
+        # preparing
+        batch_size = src[0].shape[0]
+        self.prepare(batch_size)
+        # encoding
+        h_forward, h_backword = self.encode(src)
+        # decoding with attention
+        y_hypo = self.decode_inference(h_forward, h_backword, limit)
+        return y_hypo
 
     def encode(self, src):
-        fm = fh = bm = bh = self.hidden_init
+        fm = fh = bm = bh = self.initial_state
         h_forward = []
         h_backword = []
         for fx, bx in zip(src, src[::-1]):
@@ -115,34 +132,39 @@ class Seq2SeqAttention(BaseModel):
             h_backword.append(bh)
         return h_forward, h_backword
 
-    def forward_dec_train(self, trg, a_list, b_list, y):
-        h = c = self.hidden_init
+    def decode_train(self, trg, h_forward, h_backword):
+        m = self.initial_state
+        s = F.tanh(self.W_s(h_backword[0]))
+        y = self.initial_y
         y_batch = []
-        loss = xp.Array(0, dtype=xp.float32)
+        loss = 0
         for t in trg:
-            y, c, h = self.decoder(y, c, h, a_list, b_list)
-            y_batch.append(y)
+            y, m, s = self.decoder(y, m, s, h_forward, h_backword)
+            y_batch.append(y.data.argmax(1).tolist())
             loss += F.softmax_cross_entropy(y, t)
             y = t
-        return y_batch, loss
+        return loss, y_batch
 
-    def test(self, src, trg, limit=20):
-        # preparing
-        batch_size = src[0].data.shape[0]
-        trg_wtoi = trg.wtoi
-        self.hidden_init = xp.Zeros((batch_size, self.hidden_size), dtype=xp.float32)
-        y = xp.Array([trg_wtoi[START_TOKEN] for _ in range(batch_size)], dtype=xp.int32)
-        # embeding words
-        x_list = [F.tanh(self.emb(x)) for x in src]
-        a_list, b_list = self.forward_enc(x_list)
-        h = c = self.hidden_init
-        y_line = []
+    def decode_inference(self, h_forward, h_backword, limit=20):
+        m = self.initial_state
+        s = F.tanh(self.W_s(h_backword[0]))
+        y = self.initial_y
+        y_hypo = []
+        end_token_id = self.end_token_id
+        xp = self.xp
         for _ in range(limit):
-            ab = self.att(a_list, b_list, h)
-            y, c, h = self.decoder(y, c, h, ab)
-            w = trg.itow[int(y.data.argmax(axis=1))]
-            if w == END_TOKEN:
+            y, m, s = self.decoder(y, m, s, h_forward, h_backword)
+            p = y.data.argmax(1)
+            if all(p == end_token_id):
                 break
-            y_line.append(w)
-            y = xp.Array(y.data.argmax(axis=1), dtype=xp.int32)
-        return y_line
+            y_hypo.append(p.tolist())
+            y = chainer.Variable(p.astype(xp.int32))
+        return y_hypo
+
+    def prepare(self, batch_size):
+        self.current_batch_size = batch_size
+        xp = self.xp
+        self.initial_state = chainer.Variable(xp.zeros(
+                            (batch_size, self.hidden_size), dtype=xp.float32))
+        self.initial_y = chainer.Variable(xp.array(
+                            [self.start_token_id] * batch_size, dtype=xp.int32))

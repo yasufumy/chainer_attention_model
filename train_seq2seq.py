@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from argparse import ArgumentParser
 
@@ -6,13 +7,13 @@ from chainer import serializers
 import numpy as np
 from tools.iterator import TextIterator
 from tools.text.preprocessing import OneOfMEncoder
+from tools.iterable import transpose
 
-from lib.models import Seq2SeqAttention
-from lib.preprocessing import gen_lines, line2batch, batch2line
-from lib.wrapper import xp
+from lib.seq2seq import Seq2SeqAttention
+from lib.preprocessing import gen_lines
 from lib.vocabulary import Vocabulary as vocab
 from lib.helper import timer
-from lib.config import UNKNOWN_LABEL
+from lib.config import UNKNOWN_LABEL, START_TOKEN, END_TOKEN
 
 @timer
 def train(args):
@@ -22,7 +23,8 @@ def train(args):
     trg_vocab = vocab(trg_lines, args.unk)
     trg_itow = trg_vocab.itow
 
-    model = Seq2SeqAttention(len(src_vocab), len(trg_vocab), args.embed, args.hidden)
+    model = Seq2SeqAttention(len(src_vocab), len(trg_vocab), args.embed, args.hidden,
+                             trg_vocab.wtoi[START_TOKEN], trg_vocab.wtoi[END_TOKEN])
     model.use_gpu(args.gpu)
     opt = optimizers.AdaGrad(lr=0.01)
     opt.setup(model)
@@ -30,37 +32,33 @@ def train(args):
     n_epoch = args.epoch
     batch_size = args.batch
 
-    one_of_m = OneOfMEncoder(src_vocab.wtoi, UNKNOWN_LABEL)
-    src_train = [one_of_m.encode(s) for s in gen_lines(args.train_src)]
-    one_of_m = OneOfMEncoder(trg_vocab.wtoi, UNKNOWN_LABEL)
-    trg_train = [one_of_m.encode(s) for s in gen_lines(args.train_trg)]
+    one_of_m_src = OneOfMEncoder(src_vocab.wtoi, UNKNOWN_LABEL)
+    src_train = [one_of_m_src.encode(s) for s in gen_lines(args.train_src)]
+    one_of_m_trg = OneOfMEncoder(trg_vocab.wtoi, UNKNOWN_LABEL)
+    trg_train = [one_of_m_trg.encode(s) for s in gen_lines(args.train_trg)]
+
+    N = len(src_train)
 
     for epoch in range(n_epoch):
-        order = np.random.permutation(len(src_train))
+        print('epoch: {}'.format(epoch + 1))
+        order = np.random.permutation(N)
         src_batches = TextIterator(src_train, batch_size, order=order)
         trg_batches = TextIterator(trg_train, batch_size, order=order)
         for x_batch, t_batch in zip(src_batches, trg_batches):
             model.cleargrads()
-            y_batch, loss = model(x_batch, t_batch, trg_vocab.wtoi)
+            loss, y_batch = model.loss(x_batch, t_batch)
             loss.backward()
             opt.update()
-            for line in batch2line(y_batch, trg_vocab):
-                print('epoch: ' + str(epoch + 1) +
-                        ' [' + datetime.now().strftime("%Y/%m/%d %H:%M:%S") +
-                        ']: ' + line)
+            for y in transpose(y_batch):
+                print(' '.join(trg_vocab.itow[id_] for id_ in y) + '\n')
     model.save_model(args.model)
-    return model
 
-def test(model, args):
-    src_lines = gen_lines(args.train_src)
-    trg_lines = gen_lines(args.train_trg)
-    src_vocab = vocab(src_lines, args.unk)
-    trg_vocab = vocab(trg_lines, args.unk)
-    model.use_gpu(args.gpu)
-    for x_batch in line2batch(gen_lines(args.test_src), src_vocab, 1):
-        y_batch = model.test(x_batch, trg_vocab)
+    src_test = [one_of_m_src.encode(s) for s in gen_lines(args.test_src)]
+    for x_batch in TextIterator(src_test, batch_size, shuffle=False):
+        y_hypo = model.inference(x_batch)
         with open(args.output, 'a') as f:
-            f.write(' '.join(y_batch).replace('<s> ', '').replace(' </s>',  '') + '\n')
+            for h in transpose(y_hypo):
+                f.write(' '.join(trg_vocab.itow[id_] for id_ in h) + '\n')
 
 def parse_args():
     parser = ArgumentParser()
@@ -74,14 +72,15 @@ def parse_args():
     parser.add_argument('--train_trg')
     parser.add_argument('--test_src')
     parser.add_argument('--test_trg')
-    parser.add_argument('--model')
-    parser.add_argument('--output')
+    parser.add_argument('--model', type=str,
+                        default=os.path.abspath('model/seq2seq.model'))
+    parser.add_argument('--output', type=str,
+                        default=os.path.abspath('log/inference.txt'))
     return parser.parse_args()
 
 if __name__ == '__main__':
     try:
         args = parse_args()
-        model = train(args)
-        test(model, args)
+        train(args)
     except KeyboardInterrupt:
         pass
