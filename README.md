@@ -23,6 +23,6 @@ $ python train_attmt.py --epoch [num of epoch] --embed [embed size] --hidden [hi
 
 ## Reference
 
-I refered this paper below, but I replaced GRU, Maxout with LSTM, Softmax respespectively.
+I refered the paper below, but I replaced GRU, Maxout with LSTM, Softmax respespectively.
 
 [NEURAL MACHINE TRANSLATION BY JOINTLY LEARNING TO ALIGN AND TRANSLATE](https://arxiv.org/pdf/1409.0473v7.pdf)
