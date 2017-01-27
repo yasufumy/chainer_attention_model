@@ -55,7 +55,7 @@ class AttentionDecoder(BaseModel):
         self.hidden_size = hidden_size
 
     def _attention(self, h_forward, h_backword, s):
-        batch_size = s.data.shape[0]
+        batch_size = s.shape[0]
         sentence_size = len(h_forward)
 
         weighted_s = F.expand_dims(self.W_a(s), axis=1)
