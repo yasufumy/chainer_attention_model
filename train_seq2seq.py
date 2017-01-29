@@ -39,18 +39,23 @@ def train(args):
 
     N = len(src_train)
 
-    for epoch in range(n_epoch):
-        print('epoch: {}'.format(epoch + 1))
+    for i in range(n_epoch):
+        epoch = i + 1
+        print('epoch: {}'.format(epoch))
         order = np.random.permutation(N)
         src_batches = TextIterator(src_train, batch_size, order=order)
         trg_batches = TextIterator(trg_train, batch_size, order=order)
+        sum_loss = 0
         for x_batch, t_batch in zip(src_batches, trg_batches):
             model.cleargrads()
             loss, y_batch = model.loss(x_batch, t_batch)
             loss.backward()
             opt.update()
-            for y in transpose(y_batch):
-                print(' '.join(trg_vocab.itow[id_] for id_ in y) + '\n')
+            sum_loss += loss.data
+            if epoch % 10 == 0:
+                for y in transpose(y_batch):
+                    print(' '.join(trg_vocab.itow[id_] for id_ in y) + '\n')
+        print('loss: {}'.format(sum_loss / N))
     model.save_model(args.model)
 
     src_test = [one_of_m_src.encode(s) for s in gen_lines(args.test_src)]
