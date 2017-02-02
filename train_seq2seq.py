@@ -16,7 +16,7 @@ from lib.helper import timer
 from lib.config import UNKNOWN_LABEL, START_TOKEN, END_TOKEN
 
 @timer
-def train(args):
+def main(args):
     src_lines = gen_lines(args.train_src)
     trg_lines = gen_lines(args.train_trg)
     src_vocab = vocab(src_lines, args.unk)
@@ -86,6 +86,6 @@ def parse_args():
 if __name__ == '__main__':
     try:
         args = parse_args()
-        train(args)
+        main(args)
     except KeyboardInterrupt:
         pass
