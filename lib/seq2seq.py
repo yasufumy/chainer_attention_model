@@ -17,8 +17,13 @@ class BaseModel(chainer.Chain):
         self.to_gpu()
 
     def save_model(self, filename):
-        self.to_cpu()
+        gpu_flag = False
+        if not self._cpu:
+            self.to_cpu()
+            gpu_flag = True
         serializers.save_hdf5(filename, self)
+        if gpu_flag:
+            self.to_gpu()
 
     def load_model(self, filename):
         serializers.load_hdf5(filename, self)
