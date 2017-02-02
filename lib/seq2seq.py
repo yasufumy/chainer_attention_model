@@ -38,7 +38,7 @@ class Encoder(BaseModel):
         )
 
     def __call__(self, embeded_x, m, h):
-        return F.lstm(m, F.tanh(self.W(embeded_x) + self.U(h)))
+        return F.lstm(m, self.W(embeded_x) + self.U(h))
 
 class AttentionDecoder(BaseModel):
     def __init__(self, vocab_size, embed_size, hidden_size):
@@ -86,7 +86,7 @@ class AttentionDecoder(BaseModel):
         c = self._attention(h_forward, h_backword, s)
         # decode once
         embeded_y = self.E(y)
-        m, s = F.lstm(m, F.tanh(self.W(embeded_y) + self.U(s) + self.C(c)))
+        m, s = F.lstm(m, self.W(embeded_y) + self.U(s) + self.C(c))
         t = self.U_o(s) + self.V_o(embeded_y) + self.C_o(c)
         return self.W_o(t), m, s
 
