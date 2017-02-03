@@ -37,8 +37,14 @@ class Encoder(BaseModel):
             U = L.Linear(hidden_size, 4 * hidden_size),
         )
 
-    def __call__(self, embeded_x, m, h):
-        return F.lstm(m, self.W(embeded_x) + self.U(h))
+    def __call__(self, embeded_x, m_prev, h_prev):
+        lstm_in = self.W(embeded_x) + self.U(h_prev)
+        m_tmp, h_tmp = F.lstm(m_prev, lstm_in)
+        enable = (embeded_x.data != 0)
+        m = F.where(enable, m_tmp, m_prev)
+        h = F.where(enable, h_tmp, h_prev)
+        return m, h
+
 
 class AttentionDecoder(BaseModel):
     def __init__(self, vocab_size, embed_size, hidden_size):
