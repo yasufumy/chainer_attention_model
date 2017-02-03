@@ -6,8 +6,6 @@ from chainer import serializers
 
 from config import IGNORE_LABEL, START_TOKEN, END_TOKEN
 
-MINUS_INF = - float('inf')
-
 class BaseModel(chainer.Chain):
     def __call__(self):
         pass
