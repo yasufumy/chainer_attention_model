@@ -31,21 +31,15 @@ class Encoder(BaseModel):
             # hidden weight vector of {input, output, forget} gate and input
             U = L.Linear(hidden_size, 4 * hidden_size),
         )
-        self.embed_size = embed_size
         self.hidden_size = hidden_size
 
-    def __call__(self, embeded_x, m_prev, h_prev):
-        xp = self.xp
+    def __call__(self, embeded_x, m_prev, h_prev, enable):
         batch_size = embeded_x.shape[0]
-        # mask for changing from embed_size to hidden_size
-        hidden_size = self.hidden_size
-        mask = xp.ones((batch_size, hidden_size, self.embed_size),
-                       dtype=xp.float32)
         lstm_in = self.W(embeded_x) + self.U(h_prev)
         m_tmp, h_tmp = F.lstm(m_prev, lstm_in)
         # flags if feeding previous output
-        enable = (F.reshape(F.batch_matmul(mask, embeded_x),
-                            (batch_size, hidden_size)).data != 0)
+        enable = F.broadcast_to(F.expand_dims(enable, -1),
+                                (batch_size, self.hidden_size))
         m = F.where(enable, m_tmp, m_prev)
         h = F.where(enable, h_tmp, h_prev)
         return m, h
@@ -67,7 +61,6 @@ class AttentionDecoder(BaseModel):
             W_a = L.Linear(hidden_size, hidden_size),
             v_a = L.Linear(hidden_size, 1),
         )
-        self.embed_size = embed_size
         self.hidden_size = hidden_size
 
     def _attention(self, h_forward, h_backword, s):
@@ -95,15 +88,11 @@ class AttentionDecoder(BaseModel):
         c = self._attention(h_forward, h_backword, s_prev)
         # decode once
         embeded_y = self.E(y)
-        xp = self.xp
         batch_size = y.shape[0]
-        hidden_size = self.hidden_size
-        mask = xp.ones((batch_size, hidden_size, self.embed_size),
-                       dtype=xp.float32)
         lstm_in = self.W(embeded_y) + self.U(s_prev) + self.C(c)
         m_tmp, s_tmp = F.lstm(m_prev, lstm_in)
-        enable = (F.reshape(F.batch_matmul(mask, embeded_y),
-                            (batch_size, hidden_size)).data != 0)
+        enable = F.broadcast_to(F.expand_dims(y.data != IGNORE_LABEL, -1),
+                                (batch_size, self.hidden_size))
         m = F.where(enable, m_tmp, m_prev)
         s = F.where(enable, s_tmp, s_prev)
         t = self.U_o(s) + self.V_o(embeded_y) + self.C_o(c)
@@ -148,10 +137,12 @@ class Seq2SeqAttention(BaseModel):
         h_forward = []
         h_backword = []
         for fx, bx in zip(src, src[::-1]):
+            f_enable = (fx.data != IGNORE_LABEL)
+            b_enable = (bx.data != IGNORE_LABEL)
             embeded_fx = self.embed(fx)
             embeded_bx = self.embed(bx)
-            fm, fh = self.f_encoder(embeded_fx, fm, fh)
-            bm, bh = self.b_encoder(embeded_bx, bm, bh)
+            fm, fh = self.f_encoder(embeded_fx, fm, fh, f_enable)
+            bm, bh = self.b_encoder(embeded_bx, bm, bh, b_enable)
             h_forward.append(fh)
             h_backword.append(bh)
         return h_forward, h_backword
