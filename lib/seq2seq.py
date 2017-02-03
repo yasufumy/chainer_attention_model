@@ -73,7 +73,6 @@ class AttentionDecoder(BaseModel):
         h = F.concat((F.concat(h_forward, axis=0), F.concat(h_backword, axis=0)))
         weighted_h = self.U_a(h)
         weighted_h = F.reshape(weighted_h, (batch_size, sentence_size, self.hidden_size))
-        xp = self.xp
 
         e = self.v_a(F.reshape(F.tanh(weighted_s + weighted_h),
                                (batch_size * sentence_size, self.hidden_size)))
