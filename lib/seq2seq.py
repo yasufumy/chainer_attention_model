@@ -76,8 +76,6 @@ class AttentionDecoder(BaseModel):
         weighted_h = self.U_a(h)
         weighted_h = F.reshape(weighted_h, (batch_size, sentence_size, self.hidden_size))
         xp = self.xp
-        weighted_h = F.where(weighted_h.data!=0, weighted_h,
-                             xp.full(weighted_h.shape, MINUS_INF, dtype=xp.float32))
 
         e = self.v_a(F.reshape(F.tanh(weighted_s + weighted_h),
                                (batch_size * sentence_size, self.hidden_size)))
