@@ -7,9 +7,6 @@ from chainer import serializers
 from config import IGNORE_LABEL, START_TOKEN, END_TOKEN
 
 class BaseModel(chainer.Chain):
-    def __call__(self):
-        pass
-
     def use_gpu(self, gpu_id):
         cuda.get_device(gpu_id).use()
         self.to_gpu()
