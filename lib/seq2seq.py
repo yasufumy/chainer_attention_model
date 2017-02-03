@@ -6,12 +6,7 @@ from chainer import serializers
 
 from config import IGNORE_LABEL, START_TOKEN, END_TOKEN
 
-MINUS_INF = - float('inf')
-
 class BaseModel(chainer.Chain):
-    def __call__(self):
-        pass
-
     def use_gpu(self, gpu_id):
         cuda.get_device(gpu_id).use()
         self.to_gpu()
@@ -36,9 +31,18 @@ class Encoder(BaseModel):
             # hidden weight vector of {input, output, forget} gate and input
             U = L.Linear(hidden_size, 4 * hidden_size),
         )
+        self.hidden_size = hidden_size
 
-    def __call__(self, embeded_x, m, h):
-        return F.lstm(m, self.W(embeded_x) + self.U(h))
+    def __call__(self, embeded_x, m_prev, h_prev, enable):
+        batch_size = embeded_x.shape[0]
+        lstm_in = self.W(embeded_x) + self.U(h_prev)
+        m_tmp, h_tmp = F.lstm(m_prev, lstm_in)
+        # flags if feeding previous output
+        enable = F.broadcast_to(F.expand_dims(enable, -1),
+                                (batch_size, self.hidden_size))
+        m = F.where(enable, m_tmp, m_prev)
+        h = F.where(enable, h_tmp, h_prev)
+        return m, h
 
 class AttentionDecoder(BaseModel):
     def __init__(self, vocab_size, embed_size, hidden_size):
@@ -70,8 +74,6 @@ class AttentionDecoder(BaseModel):
         weighted_h = self.U_a(h)
         weighted_h = F.reshape(weighted_h, (batch_size, sentence_size, self.hidden_size))
         xp = self.xp
-        weighted_h = F.where(weighted_h.data!=0, weighted_h,
-                             xp.full(weighted_h.shape, MINUS_INF, dtype=xp.float32))
 
         e = self.v_a(F.reshape(F.tanh(weighted_s + weighted_h),
                                (batch_size * sentence_size, self.hidden_size)))
@@ -80,13 +82,19 @@ class AttentionDecoder(BaseModel):
         c = F.batch_matmul(F.reshape(h, (batch_size, 2 * self.hidden_size, sentence_size)), alpha)
         return F.reshape(c, (batch_size, 2 * self.hidden_size))
 
-    def __call__(self, y, m, s, h_forward, h_backword):
+    def __call__(self, y, m_prev, s_prev, h_forward, h_backword):
         # m is memory cell of lstm, s is previous hidden output
         # calculate attention
-        c = self._attention(h_forward, h_backword, s)
+        c = self._attention(h_forward, h_backword, s_prev)
         # decode once
         embeded_y = self.E(y)
-        m, s = F.lstm(m, self.W(embeded_y) + self.U(s) + self.C(c))
+        batch_size = y.shape[0]
+        lstm_in = self.W(embeded_y) + self.U(s_prev) + self.C(c)
+        m_tmp, s_tmp = F.lstm(m_prev, lstm_in)
+        enable = F.broadcast_to(F.expand_dims(y.data != IGNORE_LABEL, -1),
+                                (batch_size, self.hidden_size))
+        m = F.where(enable, m_tmp, m_prev)
+        s = F.where(enable, s_tmp, s_prev)
         t = self.U_o(s) + self.V_o(embeded_y) + self.C_o(c)
         return self.W_o(t), m, s
 
@@ -129,10 +137,12 @@ class Seq2SeqAttention(BaseModel):
         h_forward = []
         h_backword = []
         for fx, bx in zip(src, src[::-1]):
+            f_enable = (fx.data != IGNORE_LABEL)
+            b_enable = (bx.data != IGNORE_LABEL)
             embeded_fx = self.embed(fx)
             embeded_bx = self.embed(bx)
-            fm, fh = self.f_encoder(embeded_fx, fm, fh)
-            bm, bh = self.b_encoder(embeded_bx, bm, bh)
+            fm, fh = self.f_encoder(embeded_fx, fm, fh, f_enable)
+            bm, bh = self.b_encoder(embeded_bx, bm, bh, b_enable)
             h_forward.append(fh)
             h_backword.append(bh)
         return h_forward, h_backword
