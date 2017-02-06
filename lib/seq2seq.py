@@ -15,13 +15,13 @@ class Encoder(BaseModel):
         )
         self.hidden_size = hidden_size
 
-    def __call__(self, embeded_x, m_prev, h_prev, feed_prev):
+    def __call__(self, embeded_x, m_prev, h_prev, x):
         batch_size = embeded_x.shape[0]
         lstm_in = self.W(embeded_x) + self.U(h_prev)
         m_tmp, h_tmp = F.lstm(m_prev, lstm_in)
         # flags if feeding previous output
-        feed_prev = F.broadcast_to(F.expand_dims(feed_prev, -1),
-                                (batch_size, self.hidden_size))
+        feed_prev = F.broadcast_to(F.expand_dims(x.data != IGNORE_LABEL, -1),
+                                   (batch_size, self.hidden_size))
         m = F.where(feed_prev, m_tmp, m_prev)
         h = F.where(feed_prev, h_tmp, h_prev)
         return m, h
@@ -117,12 +117,10 @@ class Seq2SeqAttention(BaseModel):
         h_forward = []
         h_backword = []
         for fx, bx in zip(src, src[::-1]):
-            f_feed_prev = (fx.data != IGNORE_LABEL)
-            b_feed_prev = (bx.data != IGNORE_LABEL)
             embeded_fx = self.embed(fx)
             embeded_bx = self.embed(bx)
-            fm, fh = self.f_encoder(embeded_fx, fm, fh, f_feed_prev)
-            bm, bh = self.b_encoder(embeded_bx, bm, bh, b_feed_prev)
+            fm, fh = self.f_encoder(embeded_fx, fm, fh, fx)
+            bm, bh = self.b_encoder(embeded_bx, bm, bh, bx)
             h_forward.append(fh)
             h_backword.insert(0, bh)
         return h_forward, h_backword
