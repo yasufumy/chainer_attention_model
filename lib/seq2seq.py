@@ -15,15 +15,15 @@ class Encoder(BaseModel):
         )
         self.hidden_size = hidden_size
 
-    def __call__(self, embeded_x, m_prev, h_prev, enable):
+    def __call__(self, embeded_x, m_prev, h_prev, feed_prev):
         batch_size = embeded_x.shape[0]
         lstm_in = self.W(embeded_x) + self.U(h_prev)
         m_tmp, h_tmp = F.lstm(m_prev, lstm_in)
         # flags if feeding previous output
-        enable = F.broadcast_to(F.expand_dims(enable, -1),
+        feed_prev = F.broadcast_to(F.expand_dims(feed_prev, -1),
                                 (batch_size, self.hidden_size))
-        m = F.where(enable, m_tmp, m_prev)
-        h = F.where(enable, h_tmp, h_prev)
+        m = F.where(feed_prev, m_tmp, m_prev)
+        h = F.where(feed_prev, h_tmp, h_prev)
         return m, h
 
 class AttentionDecoder(BaseModel):
@@ -72,10 +72,10 @@ class AttentionDecoder(BaseModel):
         batch_size = y.shape[0]
         lstm_in = self.W(embeded_y) + self.U(s_prev) + self.C(c)
         m_tmp, s_tmp = F.lstm(m_prev, lstm_in)
-        enable = F.broadcast_to(F.expand_dims(y.data != IGNORE_LABEL, -1),
-                                (batch_size, self.hidden_size))
-        m = F.where(enable, m_tmp, m_prev)
-        s = F.where(enable, s_tmp, s_prev)
+        feed_prev = F.broadcast_to(F.expand_dims(y.data != IGNORE_LABEL, -1),
+                                   (batch_size, self.hidden_size))
+        m = F.where(feed_prev, m_tmp, m_prev)
+        s = F.where(feed_prev, s_tmp, s_prev)
         t = self.U_o(s) + self.V_o(embeded_y) + self.C_o(c)
         return self.W_o(t), m, s
 
@@ -117,12 +117,12 @@ class Seq2SeqAttention(BaseModel):
         h_forward = []
         h_backword = []
         for fx, bx in zip(src, src[::-1]):
-            f_enable = (fx.data != IGNORE_LABEL)
-            b_enable = (bx.data != IGNORE_LABEL)
+            f_feed_prev = (fx.data != IGNORE_LABEL)
+            b_feed_prev = (bx.data != IGNORE_LABEL)
             embeded_fx = self.embed(fx)
             embeded_bx = self.embed(bx)
-            fm, fh = self.f_encoder(embeded_fx, fm, fh, f_enable)
-            bm, bh = self.b_encoder(embeded_bx, bm, bh, b_enable)
+            fm, fh = self.f_encoder(embeded_fx, fm, fh, f_feed_prev)
+            bm, bh = self.b_encoder(embeded_bx, bm, bh, b_feed_prev)
             h_forward.append(fh)
             h_backword.insert(0, bh)
         return h_forward, h_backword
