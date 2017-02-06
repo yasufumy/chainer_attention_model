@@ -125,7 +125,7 @@ class Seq2SeqAttention(BaseModel):
             fm, fh = self.f_encoder(embeded_fx, fm, fh, f_enable)
             bm, bh = self.b_encoder(embeded_bx, bm, bh, b_enable)
             h_forward.append(fh)
-            h_backword.append(bh)
+            h_backword.insert(0, bh)
         return h_forward, h_backword
 
     def decode_train(self, trg, h_forward, h_backword):
