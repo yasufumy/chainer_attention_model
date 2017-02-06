@@ -1,27 +1,9 @@
 import chainer
 import chainer.functions as F
 import chainer.links as L
-from chainer import cuda
-from chainer import serializers
+from tools.model import BaseModel
 
 from config import IGNORE_LABEL, START_TOKEN, END_TOKEN
-
-class BaseModel(chainer.Chain):
-    def use_gpu(self, gpu_id):
-        cuda.get_device(gpu_id).use()
-        self.to_gpu()
-
-    def save_model(self, filename):
-        gpu_flag = False
-        if not self._cpu:
-            self.to_cpu()
-            gpu_flag = True
-        serializers.save_hdf5(filename, self)
-        if gpu_flag:
-            self.to_gpu()
-
-    def load_model(self, filename):
-        serializers.load_hdf5(filename, self)
 
 class Encoder(BaseModel):
     def __init__(self, embed_size, hidden_size):
