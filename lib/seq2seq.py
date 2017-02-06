@@ -44,11 +44,13 @@ class AttentionDecoder(BaseModel):
             v_a = L.Linear(hidden_size, 1),
         )
         self.hidden_size = hidden_size
+        self.minus_inf = - float('inf')
 
-    def _attention(self, h_forward, h_backword, s):
+    def _attention(self, h_forward, h_backword, s, enable):
         batch_size = s.shape[0]
         sentence_size = len(h_forward)
         hidden_size = self.hidden_size
+        xp = self.xp
 
         weighted_s = F.broadcast_to(F.expand_dims(self.W_a(s), axis=1),
                                     (batch_size, sentence_size, hidden_size))
@@ -57,15 +59,16 @@ class AttentionDecoder(BaseModel):
 
         e = self.v_a(F.reshape(F.tanh(weighted_s + weighted_h),
                                (batch_size * sentence_size, hidden_size)))
-        e = F.reshape(e, (batch_size, sentence_size))
+        e = F.where(enable, F.reshape(e, (batch_size, sentence_size)),
+                    xp.full((batch_size, sentence_size), self.minus_inf, dtype=xp.float32))
         alpha = F.softmax(e)
         c = F.batch_matmul(F.reshape(h, (batch_size, 2 * hidden_size, sentence_size)), alpha)
         return F.reshape(c, (batch_size, 2 * hidden_size))
 
-    def __call__(self, y, m_prev, s_prev, h_forward, h_backword):
+    def __call__(self, y, m_prev, s_prev, h_forward, h_backword, enable):
         # m is memory cell of lstm, s is previous hidden output
         # calculate attention
-        c = self._attention(h_forward, h_backword, s_prev)
+        c = self._attention(h_forward, h_backword, s_prev, enable)
         # decode once
         embeded_y = self.E(y)
         batch_size = y.shape[0]
@@ -96,10 +99,12 @@ class Seq2SeqAttention(BaseModel):
         # preparing
         batch_size = src[0].shape[0]
         self.prepare(batch_size)
+        enable = F.reshape(self.xp.asarray([s.data.tolist() for s in src]) != -1,
+                           (batch_size, len(src)))
         # encoding
         h_forward, h_backword = self.encode(src)
         # decoding with attention
-        loss, y_batch = self.decode_train(trg, h_forward, h_backword)
+        loss, y_batch = self.decode_train(trg, h_forward, h_backword, enable)
         return loss, y_batch
 
     def inference(self, src, limit=20):
@@ -127,14 +132,14 @@ class Seq2SeqAttention(BaseModel):
             h_backword.insert(0, bh)
         return h_forward, h_backword
 
-    def decode_train(self, trg, h_forward, h_backword):
+    def decode_train(self, trg, h_forward, h_backword, enable):
         m = self.initial_state
         s = F.tanh(self.W_s(h_backword[0]))
         y = self.initial_y
         y_batch = []
         loss = 0
         for t in trg:
-            y, m, s = self.decoder(y, m, s, h_forward, h_backword)
+            y, m, s = self.decoder(y, m, s, h_forward, h_backword, enable)
             y_batch.append(y.data.argmax(1).tolist())
             loss += F.softmax_cross_entropy(y, t)
             y = t
