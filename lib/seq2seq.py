@@ -157,7 +157,6 @@ class Seq2SeqAttention(BaseModel):
         return y_hypo
 
     def prepare(self, batch_size):
-        self.current_batch_size = batch_size
         xp = self.xp
         self.initial_state = chainer.Variable(xp.zeros(
                             (batch_size, self.hidden_size), dtype=xp.float32))
