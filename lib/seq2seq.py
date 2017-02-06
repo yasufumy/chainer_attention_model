@@ -48,20 +48,21 @@ class AttentionDecoder(BaseModel):
     def _attention(self, h_forward, h_backword, s):
         batch_size = s.shape[0]
         sentence_size = len(h_forward)
+        hidden_size = self.hidden_size
 
         weighted_s = F.expand_dims(self.W_a(s), axis=1)
         weighted_s = F.broadcast_to(weighted_s,
-                                    (batch_size, sentence_size, self.hidden_size))
+                                    (batch_size, sentence_size, hidden_size))
         h = F.concat((F.concat(h_forward, axis=0), F.concat(h_backword, axis=0)))
         weighted_h = self.U_a(h)
-        weighted_h = F.reshape(weighted_h, (batch_size, sentence_size, self.hidden_size))
+        weighted_h = F.reshape(weighted_h, (batch_size, sentence_size, hidden_size))
 
         e = self.v_a(F.reshape(F.tanh(weighted_s + weighted_h),
-                               (batch_size * sentence_size, self.hidden_size)))
+                               (batch_size * sentence_size, hidden_size)))
         e = F.reshape(e, (batch_size, sentence_size))
         alpha = F.softmax(e)
-        c = F.batch_matmul(F.reshape(h, (batch_size, 2 * self.hidden_size, sentence_size)), alpha)
-        return F.reshape(c, (batch_size, 2 * self.hidden_size))
+        c = F.batch_matmul(F.reshape(h, (batch_size, 2 * hidden_size, sentence_size)), alpha)
+        return F.reshape(c, (batch_size, 2 * hidden_size))
 
     def __call__(self, y, m_prev, s_prev, h_forward, h_backword):
         # m is memory cell of lstm, s is previous hidden output
