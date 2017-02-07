@@ -92,7 +92,7 @@ class Seq2SeqAttention(BaseModel):
         self.hidden_size = hidden_size
         self.start_token_id = start_token_id
         self.end_token_id = end_token_id
-        self.minus_inf = - float('inf')
+        self.very_small_value = - 746
 
     def loss(self, src, trg):
         # preparing
@@ -166,7 +166,7 @@ class Seq2SeqAttention(BaseModel):
                             (batch_size, self.hidden_size), dtype=xp.float32))
         self.initial_y = chainer.Variable(xp.array(
                             [self.start_token_id] * batch_size, dtype=xp.int32))
-        self.enable = F.reshape(xp.asarray([s.data.tolist() for s in src]) != -1,
+        self.enable = F.reshape(xp.asarray([s.data.tolist() for s in src]) != IGNORE_LABEL,
                            (batch_size, sentence_size))
         self.disable_value = xp.full((batch_size, sentence_size),
-                                      self.minus_inf, dtype=xp.float32)
+                                      self.very_small_value, dtype=xp.float32)
