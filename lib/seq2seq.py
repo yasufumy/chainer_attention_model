@@ -92,7 +92,7 @@ class Seq2SeqAttention(BaseModel):
         self.hidden_size = hidden_size
         self.start_token_id = start_token_id
         self.end_token_id = end_token_id
-        self.minus_inf = - float('inf')
+        self.minus_inf = - 746
 
     def loss(self, src, trg):
         # preparing
