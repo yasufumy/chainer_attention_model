@@ -166,7 +166,7 @@ class Seq2SeqAttention(BaseModel):
                             (batch_size, self.hidden_size), dtype=xp.float32))
         self.initial_y = chainer.Variable(xp.array(
                             [self.start_token_id] * batch_size, dtype=xp.int32))
-        self.enable = F.reshape(xp.asarray([s.data.tolist() for s in src]) != -1,
+        self.enable = F.reshape(xp.asarray([s.data.tolist() for s in src]) != IGNORE_LABEL,
                            (batch_size, sentence_size))
         self.disable_value = xp.full((batch_size, sentence_size),
                                       self.very_small_value, dtype=xp.float32)
