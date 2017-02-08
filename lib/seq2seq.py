@@ -20,10 +20,10 @@ class Encoder(BaseModel):
         lstm_in = self.W(embeded_x) + self.U(h_prev)
         m_tmp, h_tmp = F.lstm(m_prev, lstm_in)
         # flags if feeding previous output
-        feed_prev = F.broadcast_to(F.expand_dims(x.data != IGNORE_LABEL, -1),
+        feed_prev = F.broadcast_to(F.expand_dims(x.data == IGNORE_LABEL, -1),
                                    (batch_size, self.hidden_size))
-        m = F.where(feed_prev, m_tmp, m_prev)
-        h = F.where(feed_prev, h_tmp, h_prev)
+        m = F.where(feed_prev, m_prev, m_tmp)
+        h = F.where(feed_prev, h_prev, h_tmp)
         return m, h
 
 class AttentionDecoder(BaseModel):
@@ -45,15 +45,14 @@ class AttentionDecoder(BaseModel):
         )
         self.hidden_size = hidden_size
 
-    def _attention(self, h_forward, h_backword, s, enable, disable_value):
+    def _attention(self, h, s, enable, disable_value):
         batch_size = s.shape[0]
-        sentence_size = len(h_forward)
+        sentence_size = h.shape[0] // batch_size
         hidden_size = self.hidden_size
         xp = self.xp
 
         weighted_s = F.broadcast_to(F.expand_dims(self.W_a(s), axis=1),
                                     (batch_size, sentence_size, hidden_size))
-        h = F.concat((F.concat(h_forward, axis=0), F.concat(h_backword, axis=0)))
         weighted_h = F.reshape(self.U_a(h), (batch_size, sentence_size, hidden_size))
 
         e = self.v_a(F.reshape(F.tanh(weighted_s + weighted_h),
@@ -63,19 +62,19 @@ class AttentionDecoder(BaseModel):
         c = F.batch_matmul(F.reshape(h, (batch_size, 2 * hidden_size, sentence_size)), alpha)
         return F.reshape(c, (batch_size, 2 * hidden_size))
 
-    def __call__(self, y, m_prev, s_prev, h_forward, h_backword, enable, disable_value):
+    def __call__(self, y, m_prev, s_prev, h, enable, disable_value):
         # m is memory cell of lstm, s is previous hidden output
         # calculate attention
-        c = self._attention(h_forward, h_backword, s_prev, enable, disable_value)
+        c = self._attention(h, s_prev, enable, disable_value)
         # decode once
         embeded_y = self.E(y)
         batch_size = y.shape[0]
         lstm_in = self.W(embeded_y) + self.U(s_prev) + self.C(c)
         m_tmp, s_tmp = F.lstm(m_prev, lstm_in)
-        feed_prev = F.broadcast_to(F.expand_dims(y.data != IGNORE_LABEL, -1),
+        feed_prev = F.broadcast_to(F.expand_dims(y.data == IGNORE_LABEL, -1),
                                    (batch_size, self.hidden_size))
-        m = F.where(feed_prev, m_tmp, m_prev)
-        s = F.where(feed_prev, s_tmp, s_prev)
+        m = F.where(feed_prev, m_prev, m_tmp)
+        s = F.where(feed_prev, s_prev, s_tmp)
         t = self.U_o(s) + self.V_o(embeded_y) + self.C_o(c)
         return self.W_o(t), m, s
 
@@ -128,13 +127,14 @@ class Seq2SeqAttention(BaseModel):
     def decode_train(self, trg, h_forward, h_backword):
         m = self.initial_state
         s = F.tanh(self.W_s(h_backword[0]))
+        h = F.concat((F.concat(h_forward, axis=0), F.concat(h_backword, axis=0)))
         y = self.initial_y
         enable = self.enable
         disable_value = self.disable_value
         y_batch = []
         loss = 0
         for t in trg:
-            y, m, s = self.decoder(y, m, s, h_forward, h_backword, enable, disable_value)
+            y, m, s = self.decoder(y, m, s, h, enable, disable_value)
             y_batch.append(y.data.argmax(1).tolist())
             loss += F.softmax_cross_entropy(y, t)
             y = t
@@ -143,6 +143,7 @@ class Seq2SeqAttention(BaseModel):
     def decode_inference(self, h_forward, h_backword, limit=20):
         m = self.initial_state
         s = F.tanh(self.W_s(h_backword[0]))
+        h = F.concat((F.concat(h_forward, axis=0), F.concat(h_backword, axis=0)))
         y = self.initial_y
         enable = self.enable
         disable_value = self.disable_value
@@ -150,7 +151,7 @@ class Seq2SeqAttention(BaseModel):
         end_token_id = self.end_token_id
         xp = self.xp
         for _ in range(limit):
-            y, m, s = self.decoder(y, m, s, h_forward, h_backword, enable, disable_value)
+            y, m, s = self.decoder(y, m, s, h, enable, disable_value)
             p = y.data.argmax(1)
             if all(p == end_token_id):
                 break
