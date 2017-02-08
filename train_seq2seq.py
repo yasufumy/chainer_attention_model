@@ -61,7 +61,7 @@ def main(args):
     src_test = [one_of_m_src.encode(s) for s in gen_lines(args.test_src)]
     for x_batch in TextIterator(src_test, batch_size, shuffle=False):
         y_hypo = model.inference(x_batch)
-        with open(args.output, 'a') as f:
+        with open(args.output, 'w') as f:
             for h in transpose(y_hypo):
                 f.write(' '.join(trg_vocab.itow[id_] for id_ in h) + '\n')
 
