@@ -20,10 +20,10 @@ class Encoder(BaseModel):
         lstm_in = self.W(embeded_x) + self.U(h_prev)
         m_tmp, h_tmp = F.lstm(m_prev, lstm_in)
         # flags if feeding previous output
-        feed_prev = F.broadcast_to(F.expand_dims(x.data != IGNORE_LABEL, -1),
+        feed_prev = F.broadcast_to(F.expand_dims(x.data == IGNORE_LABEL, -1),
                                    (batch_size, self.hidden_size))
-        m = F.where(feed_prev, m_tmp, m_prev)
-        h = F.where(feed_prev, h_tmp, h_prev)
+        m = F.where(feed_prev, m_prev, m_tmp)
+        h = F.where(feed_prev, h_prev, h_tmp)
         return m, h
 
 class AttentionDecoder(BaseModel):
@@ -72,10 +72,10 @@ class AttentionDecoder(BaseModel):
         batch_size = y.shape[0]
         lstm_in = self.W(embeded_y) + self.U(s_prev) + self.C(c)
         m_tmp, s_tmp = F.lstm(m_prev, lstm_in)
-        feed_prev = F.broadcast_to(F.expand_dims(y.data != IGNORE_LABEL, -1),
+        feed_prev = F.broadcast_to(F.expand_dims(y.data == IGNORE_LABEL, -1),
                                    (batch_size, self.hidden_size))
-        m = F.where(feed_prev, m_tmp, m_prev)
-        s = F.where(feed_prev, s_tmp, s_prev)
+        m = F.where(feed_prev, m_prev, m_tmp)
+        s = F.where(feed_prev, s_prev, s_tmp)
         t = self.U_o(s) + self.V_o(embeded_y) + self.C_o(c)
         return self.W_o(t), m, s
 
