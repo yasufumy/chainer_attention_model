@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 from chainer import optimizers, cuda
 from chainer import serializers
 import numpy as np
-from tools.iterator import TextIterator
+from tools.iterator import SequentialIterator
 from tools.text.preprocessing import OneOfMEncoder
 from tools.iterable import transpose
 
@@ -43,8 +43,8 @@ def main(args):
         epoch = i + 1
         print('epoch: {}'.format(epoch))
         order = np.random.permutation(N)
-        src_batches = TextIterator(src_train, batch_size, order=order)
-        trg_batches = TextIterator(trg_train, batch_size, order=order)
+        src_batches = SequentialIterator(src_train, batch_size, order=order)
+        trg_batches = SequentialIterator(trg_train, batch_size, order=order)
         sum_loss = 0
         for x_batch, t_batch in zip(src_batches, trg_batches):
             model.cleargrads()
@@ -59,7 +59,7 @@ def main(args):
     model.save_model(args.model)
 
     src_test = [one_of_m_src.encode(s) for s in gen_lines(args.test_src)]
-    for x_batch in TextIterator(src_test, batch_size, shuffle=False):
+    for x_batch in SequentialIterator(src_test, batch_size, shuffle=False):
         y_hypo = model.inference(x_batch)
         with open(args.output, 'w') as f:
             for h in transpose(y_hypo):
